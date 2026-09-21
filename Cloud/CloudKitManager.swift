@@ -103,6 +103,7 @@ actor CloudKitManager {
         // No OTP secret or account metadata is uploaded in plaintext.
         record["blob"] = item.encryptedBlob as CKRecordValue
         record["version"] = item.version as CKRecordValue
+        record["keyVersion"] = item.keyVersion as CKRecordValue
         record["createdAt"] = item.createdAt as CKRecordValue
         record["updatedAt"] = item.updatedAt as CKRecordValue
     }
@@ -185,10 +186,13 @@ actor CloudKitManager {
                 throw CloudKitManagerError.malformedRecord(recordID.recordName)
             }
 
+            let keyVersion = record["keyVersion"] as? Int ?? 1
+
             return EncryptedOTPAccount(
                 id: uuid,
                 encryptedBlob: blob,
                 version: version,
+                keyVersion: keyVersion,
                 createdAt: createdAt,
                 updatedAt: updatedAt
             )

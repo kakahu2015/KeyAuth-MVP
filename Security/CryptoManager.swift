@@ -13,7 +13,17 @@ enum CryptoManagerError: LocalizedError {
 }
 
 struct CryptoManager {
-    static func associatedData(for id: UUID, version: Int) -> Data {
+    static func associatedData(
+        for id: UUID,
+        version: Int,
+        keyVersion: Int
+    ) -> Data {
+        Data(
+            "KeyAuth/EncryptedOTP/v\(version)/k\(keyVersion)/\(id.uuidString)".utf8
+        )
+    }
+
+    static func legacyAssociatedData(for id: UUID, version: Int) -> Data {
         Data("KeyAuth/EncryptedOTP/v\(version)/\(id.uuidString)".utf8)
     }
 

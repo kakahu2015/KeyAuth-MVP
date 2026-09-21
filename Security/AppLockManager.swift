@@ -3,6 +3,11 @@ import Foundation
 @preconcurrency import LocalAuthentication
 import UIKit
 
+struct UnlockedKeyring {
+    let currentVersion: Int
+    let keys: [Int: SymmetricKey]
+}
+
 @MainActor
 final class AppLockManager: ObservableObject {
     @Published private(set) var isLocked = true
@@ -11,7 +16,7 @@ final class AppLockManager: ObservableObject {
 
     private var context: LAContext?
     private var attemptID: UUID?
-    private var pendingMasterKey: SymmetricKey?
+    private var pendingKeyring: UnlockedKeyring?
 
     /// The system authentication is performed by the protected Keychain
     /// query itself. The UI does not unlock until that query returns the key.
@@ -28,26 +33,56 @@ final class AppLockManager: ObservableObject {
 
         Task { @MainActor [weak self] in
             do {
-                var masterKey = try await KeychainManager.shared.readMasterKey(
-                    context: context
-                )
+                let currentVersion = await KeychainManager.shared
+                    .currentMasterKeyVersion()
+                var versions = await KeychainManager.shared.knownKeyVersions()
 
-                if masterKey == nil {
-                    // First launch: create the device-bound item, then read it
-                    // through the same authenticated Keychain path. The key
-                    // is never handed to the app before that read succeeds.
-                    try await KeychainManager.shared.createMasterKey()
-                    masterKey = try await KeychainManager.shared.readMasterKey(
-                        context: context
-                    )
+                if let pendingVersion = await KeychainManager.shared
+                    .pendingRotationVersion(),
+                   !versions.contains(pendingVersion) {
+                    versions.append(pendingVersion)
                 }
 
+                if !versions.contains(currentVersion) {
+                    versions.append(currentVersion)
+                }
+
+                var keys: [Int: SymmetricKey] = [:]
+                for version in versions.sorted() {
+                    if let key = try await KeychainManager.shared.readMasterKey(
+                        version: version,
+                        context: context
+                    ) {
+                        keys[version] = key
+                    }
+                }
+
+                // First launch: create v1, then read it through the protected
+                // Keychain query so the key is never used before auth.
+                if keys.isEmpty, currentVersion == 1 {
+                    try await KeychainManager.shared.createMasterKey()
+                    if let key = try await KeychainManager.shared.readMasterKey(
+                        version: 1,
+                        context: context
+                    ) {
+                        keys[1] = key
+                    }
+                }
+
+                guard keys[currentVersion] != nil else {
+                    throw KeychainError.masterKeyUnavailable
+                }
+
+                let keyring = UnlockedKeyring(
+                    currentVersion: currentVersion,
+                    keys: keys
+                )
+
                 guard let self,
-                      self.attemptID == id,
-                      let masterKey
+                      self.attemptID == id
                 else { return }
 
-                self.pendingMasterKey = masterKey
+                self.pendingKeyring = keyring
                 self.attemptID = nil
                 self.context = nil
                 self.isAuthenticating = false
@@ -63,16 +98,16 @@ final class AppLockManager: ObservableObject {
         }
     }
 
-    func consumeMasterKey() -> SymmetricKey? {
-        defer { pendingMasterKey = nil }
-        return pendingMasterKey
+    func consumeKeyring() -> UnlockedKeyring? {
+        defer { pendingKeyring = nil }
+        return pendingKeyring
     }
 
     func lock() {
         attemptID = nil
         context?.invalidate()
         context = nil
-        pendingMasterKey = nil
+        pendingKeyring = nil
         isLocked = true
         isAuthenticating = false
     }

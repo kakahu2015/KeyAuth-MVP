@@ -71,11 +71,12 @@ struct OTPAccountPayload: Codable, Sendable, Hashable {
 }
 
 struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     let id: UUID
     var encryptedBlob: Data
     var version: Int
+    var keyVersion: Int
     var createdAt: Date
     var updatedAt: Date
 
@@ -83,13 +84,34 @@ struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
         id: UUID = UUID(),
         encryptedBlob: Data,
         version: Int = EncryptedOTPAccount.currentVersion,
+        keyVersion: Int = 1,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
         self.id = id
         self.encryptedBlob = encryptedBlob
         self.version = version
+        self.keyVersion = keyVersion
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, encryptedBlob, version, keyVersion, createdAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decode(UUID.self, forKey: .id)
+        encryptedBlob = try container.decode(Data.self, forKey: .encryptedBlob)
+        version = try container.decode(Int.self, forKey: .version)
+        // Existing records were encrypted with Key v1.
+        keyVersion = try container.decodeIfPresent(
+            Int.self,
+            forKey: .keyVersion
+        ) ?? 1
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }

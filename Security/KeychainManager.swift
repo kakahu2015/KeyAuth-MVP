@@ -26,33 +26,87 @@ enum KeychainError: LocalizedError {
 actor KeychainManager {
     static let shared = KeychainManager()
 
-    private let service = "KeyAuth.MasterKey.v2"
     private let legacyService = "KeyAuth.MasterKey.v1"
     private let account = "primary"
     private let simulatorStorageKey = "KeyAuth.SimulatorMasterKey.v1"
+    private let currentKeyVersionKey = "KeyAuth.MasterKey.CurrentVersion"
+    private let knownKeyVersionsKey = "KeyAuth.MasterKey.KnownVersions"
+    private let pendingRotationKey = "KeyAuth.MasterKey.PendingRotation"
+
+    func currentMasterKeyVersion() -> Int {
+        let value = UserDefaults.standard.integer(forKey: currentKeyVersionKey)
+        return value == 0 ? 1 : value
+    }
+
+    func knownKeyVersions() -> [Int] {
+        let values = UserDefaults.standard.array(
+            forKey: knownKeyVersionsKey
+        ) as? [Int]
+
+        return values ?? [1]
+    }
+
+    func pendingRotationVersion() -> Int? {
+        let value = UserDefaults.standard.integer(forKey: pendingRotationKey)
+        return value == 0 ? nil : value
+    }
+
+    private func service(for version: Int) -> String {
+        if version == 1 {
+            // Keep compatibility with the existing device-bound key.
+            return "KeyAuth.MasterKey.v2"
+        }
+
+        return "KeyAuth.MasterKey.v2.k\(version)"
+    }
+
+    private func simulatorStorageKey(for version: Int) -> String {
+        if version == 1 {
+            return simulatorStorageKey
+        }
+
+        return "\(simulatorStorageKey).k\(version)"
+    }
 
     /// Reads the device-bound master key. The Keychain access-control policy
     /// causes Security.framework to ask for Face ID, Touch ID, or the device
     /// passcode before returning the key.
-    func readMasterKey(context: LAContext) throws -> SymmetricKey? {
+    func readMasterKey(
+        version: Int,
+        context: LAContext
+    ) throws -> SymmetricKey? {
 #if targetEnvironment(simulator)
-        guard let data = UserDefaults.standard.data(forKey: simulatorStorageKey) else {
+        guard let data = UserDefaults.standard.data(
+            forKey: simulatorStorageKey(for: version)
+        ) else {
             return nil
         }
         return try makeKey(from: data)
 #else
-        if let protectedData = try readProtectedMasterKeyData(context: context) {
+        if let protectedData = try readProtectedMasterKeyData(
+            version: version,
+            context: context
+        ) {
             return try makeKey(from: protectedData)
         }
 
         // Migrate the previous synchronizable key only through this
         // authenticated path. The migrated device-only item is read with the
         // supplied LAContext before it is returned to the app.
+        guard version == 1 else {
+            return nil
+        }
         guard let legacyData = try readLegacyMasterKeyData() else {
             return nil
         }
-        _ = try storeProtectedMasterKeyData(legacyData)
-        guard let migratedData = try readProtectedMasterKeyData(context: context) else {
+        _ = try storeProtectedMasterKeyData(
+            legacyData,
+            service: service(for: version)
+        )
+        guard let migratedData = try readProtectedMasterKeyData(
+            version: version,
+            context: context
+        ) else {
             throw KeychainError.masterKeyUnavailable
         }
         try deleteLegacyMasterKey()
@@ -60,18 +114,69 @@ actor KeychainManager {
 #endif
     }
 
+    func readMasterKey(context: LAContext) throws -> SymmetricKey? {
+        try readMasterKey(version: currentMasterKeyVersion(), context: context)
+    }
+
     /// Creates a new device-bound master key. Callers must immediately read it
-    /// through readMasterKey(context:) so the newly-created userPresence item
-    /// performs the system authentication before the key is used.
+    /// through readMasterKey(version:context:) so the newly-created
+    /// userPresence item performs system authentication before the key is used.
     func createMasterKey() throws {
         let data = try randomKeyData()
 #if targetEnvironment(simulator)
         // Unsigned simulator builds cannot use the real Keychain entitlement;
         // simulator storage is deliberately local-only development storage.
-        UserDefaults.standard.set(data, forKey: simulatorStorageKey)
+        UserDefaults.standard.set(
+            data,
+            forKey: simulatorStorageKey(for: 1)
+        )
 #else
-        _ = try storeProtectedMasterKeyData(data)
+        _ = try storeProtectedMasterKeyData(
+            data,
+            service: service(for: 1)
+        )
 #endif
+    }
+
+    func createNextMasterKey(
+        context: LAContext
+    ) throws -> (Int, SymmetricKey) {
+        let newVersion = currentMasterKeyVersion() + 1
+        let data = try randomKeyData()
+
+#if targetEnvironment(simulator)
+        let storageKey = simulatorStorageKey(for: newVersion)
+        if UserDefaults.standard.data(forKey: storageKey) == nil {
+            UserDefaults.standard.set(data, forKey: storageKey)
+        }
+#else
+        _ = try storeProtectedMasterKeyData(
+            data,
+            service: service(for: newVersion)
+        )
+#endif
+
+        var known = knownKeyVersions()
+        if !known.contains(newVersion) {
+            known.append(newVersion)
+            UserDefaults.standard.set(known, forKey: knownKeyVersionsKey)
+        }
+
+        UserDefaults.standard.set(newVersion, forKey: pendingRotationKey)
+
+        guard let key = try readMasterKey(
+            version: newVersion,
+            context: context
+        ) else {
+            throw KeychainError.masterKeyUnavailable
+        }
+
+        return (newVersion, key)
+    }
+
+    func commitRotation(version: Int) {
+        UserDefaults.standard.set(version, forKey: currentKeyVersionKey)
+        UserDefaults.standard.removeObject(forKey: pendingRotationKey)
     }
 
     private func makeKey(from data: Data) throws -> SymmetricKey {
@@ -105,12 +210,13 @@ actor KeychainManager {
     }
 
     private func readProtectedMasterKeyData(
+        version: Int,
         context: LAContext
     ) throws -> Data? {
         context.localizedReason = "解锁 KeyAuth 以读取主密钥。"
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: service(for: version),
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
@@ -161,7 +267,10 @@ actor KeychainManager {
         }
     }
 
-    private func storeProtectedMasterKeyData(_ data: Data) throws -> Data {
+    private func storeProtectedMasterKeyData(
+        _ data: Data,
+        service: String
+    ) throws -> Data {
         guard data.count == 32 else {
             throw KeychainError.malformedKeyData
         }

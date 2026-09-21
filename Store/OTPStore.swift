@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import CloudKit
+@preconcurrency import LocalAuthentication
 
 enum OTPStoreError: LocalizedError {
     case cloudAccountUnavailable
@@ -38,7 +39,13 @@ final class OTPStore: ObservableObject {
         let updatedAt: Date
     }
 
-    private var masterKey: SymmetricKey?
+    private var masterKeys: [Int: SymmetricKey] = [:]
+    private var currentKeyVersion = 1
+
+    private var masterKey: SymmetricKey? {
+        masterKeys[currentKeyVersion]
+    }
+
     private var cloudOwner: String?
     private var syncTask: Task<Void, Never>?
     private var syncRequested = false
@@ -59,7 +66,8 @@ final class OTPStore: ObservableObject {
         lastError = nil
         syncMessage = nil
         isReady = false
-        masterKey = nil
+        masterKeys = [:]
+        currentKeyVersion = 1
         accounts = []
         cloudOwner = UserDefaults.standard.string(forKey: cloudOwnerKey)
         isCloudSyncEnabled = await CloudKitManager.shared.isConfigured
@@ -67,27 +75,34 @@ final class OTPStore: ObservableObject {
     }
 
     @discardableResult
-    func unlock(with key: SymmetricKey) async -> Bool {
+    func unlock(
+        keys: [Int: SymmetricKey],
+        currentVersion: Int
+    ) async -> Bool {
         await syncTask?.value
         isLoading = true
         lastError = nil
         syncMessage = nil
-        masterKey = key
+        masterKeys = keys
+        currentKeyVersion = currentVersion
         isReady = false
 
         do {
+            guard masterKey != nil else {
+                throw OTPStoreError.masterKeyUnavailable
+            }
+
             let localEncrypted = try await LocalEncryptedStore.shared.fetchAll()
             let uniqueEncrypted = try await removeExactDuplicates(
-                from: localEncrypted,
-                using: key
+                from: localEncrypted
             )
-            try await installLocalAccounts(uniqueEncrypted, using: key)
+            try await installLocalAccounts(uniqueEncrypted)
             isReady = true
             isLoading = false
             startPendingUploads()
             return true
         } catch {
-            masterKey = nil
+            masterKeys = [:]
             accounts = []
             isReady = false
             isLoading = false
@@ -100,7 +115,7 @@ final class OTPStore: ObservableObject {
         syncTask?.cancel()
         syncTask = nil
         syncRequested = false
-        masterKey = nil
+        masterKeys = [:]
         accounts = []
         isReady = false
         isLoading = false
@@ -108,17 +123,17 @@ final class OTPStore: ObservableObject {
     }
 
     func refresh() async throws {
-        guard isReady, let masterKey else {
+        guard isReady, masterKey != nil else {
             throw OTPStoreError.masterKeyUnavailable
         }
 
         await syncTask?.value
 
         if isCloudSyncEnabled {
-            try await synchronizeCloud(using: masterKey)
+            try await synchronizeCloud()
         } else {
             let localEncrypted = try await LocalEncryptedStore.shared.fetchAll()
-            try await installLocalAccounts(localEncrypted, using: masterKey)
+            try await installLocalAccounts(localEncrypted)
         }
     }
 
@@ -167,18 +182,13 @@ final class OTPStore: ObservableObject {
     }
 
     private func replaceAccounts(
-        with encrypted: [EncryptedOTPAccount],
-        using masterKey: SymmetricKey?
+        with encrypted: [EncryptedOTPAccount]
     ) async throws {
-        guard let masterKey else {
-            throw OTPStoreError.masterKeyUnavailable
-        }
-
         var decoded: [DecryptedAccount] = []
         decoded.reserveCapacity(encrypted.count)
 
         for item in encrypted where !deletedIDs.contains(item.id.uuidString) {
-            let payload = try decryptPayload(for: item, using: masterKey)
+            let payload = try decryptPayload(for: item)
             decoded.append(DecryptedAccount(
                 id: item.id,
                 payload: payload,
@@ -195,39 +205,51 @@ final class OTPStore: ObservableObject {
     }
 
     private func decryptPayload(
-        for item: EncryptedOTPAccount,
-        using masterKey: SymmetricKey
+        for item: EncryptedOTPAccount
     ) throws -> OTPAccountPayload {
+        guard let key = masterKeys[item.keyVersion] else {
+            throw OTPStoreError.masterKeyUnavailable
+        }
+
         do {
+            if item.version >= 3 {
+                return try CryptoManager.decrypt(
+                    OTPAccountPayload.self,
+                    from: item.encryptedBlob,
+                    using: key,
+                    associatedData: CryptoManager.associatedData(
+                        for: item.id,
+                        version: item.version,
+                        keyVersion: item.keyVersion
+                    )
+                )
+
+            }
+
             return try CryptoManager.decrypt(
                 OTPAccountPayload.self,
                 from: item.encryptedBlob,
-                using: masterKey,
-                associatedData: CryptoManager.associatedData(
+                using: key,
+                associatedData: CryptoManager.legacyAssociatedData(
                     for: item.id,
                     version: item.version
                 )
             )
         } catch {
-            guard item.version == 1 else {
-                throw OTPStoreError.undecryptableRecord
-            }
-
-            do {
+            if item.version == 1 {
                 return try CryptoManager.decryptLegacy(
                     OTPAccountPayload.self,
                     from: item.encryptedBlob,
-                    using: masterKey
+                    using: key
                 )
-            } catch {
-                throw OTPStoreError.undecryptableRecord
             }
+
+            throw OTPStoreError.undecryptableRecord
         }
     }
 
     private func removeExactDuplicates(
-        from encrypted: [EncryptedOTPAccount],
-        using masterKey: SymmetricKey
+        from encrypted: [EncryptedOTPAccount]
     ) async throws -> [EncryptedOTPAccount] {
         var seenAccounts = Set<OTPAccountIdentity>()
         var unique: [EncryptedOTPAccount] = []
@@ -241,7 +263,7 @@ final class OTPStore: ObservableObject {
         }
 
         for item in ordered {
-            let payload = try decryptPayload(for: item, using: masterKey)
+            let payload = try decryptPayload(for: item)
             guard seenAccounts.insert(payload.identity).inserted else {
                 // Keep the oldest copy and remove later records for the same
                 // OTP credential, even if their display names differ.
@@ -281,20 +303,23 @@ final class OTPStore: ObservableObject {
             }
 
             let id = UUID()
+            let keyVersion = currentKeyVersion
             let version = EncryptedOTPAccount.currentVersion
             let encryptedBlob = try CryptoManager.encrypt(
                 payload,
                 using: masterKey,
                 associatedData: CryptoManager.associatedData(
                     for: id,
-                    version: version
+                    version: version,
+                    keyVersion: keyVersion
                 )
             )
 
             let item = EncryptedOTPAccount(
                 id: id,
                 encryptedBlob: encryptedBlob,
-                version: version
+                version: version,
+                keyVersion: keyVersion
             )
 
             try await saveEncryptedAccount(item)
@@ -330,19 +355,22 @@ final class OTPStore: ObservableObject {
                 period: account.payload.period,
                 displayName: displayName.isEmpty ? nil : displayName
             )
+            let keyVersion = currentKeyVersion
             let version = EncryptedOTPAccount.currentVersion
             let encryptedBlob = try CryptoManager.encrypt(
                 payload,
                 using: masterKey,
                 associatedData: CryptoManager.associatedData(
                     for: id,
-                    version: version
+                    version: version,
+                    keyVersion: keyVersion
                 )
             )
             let item = EncryptedOTPAccount(
                 id: id,
                 encryptedBlob: encryptedBlob,
                 version: version,
+                keyVersion: keyVersion,
                 createdAt: account.createdAt,
                 updatedAt: .now
             )
@@ -383,19 +411,78 @@ final class OTPStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func rotateMasterKey(context: LAContext) async -> Bool {
+        lastError = nil
+
+        do {
+            guard isReady, masterKey != nil else {
+                throw OTPStoreError.masterKeyUnavailable
+            }
+
+            let (newVersion, newKey) = try await KeychainManager.shared
+                .createNextMasterKey(context: context)
+            let encrypted = try await LocalEncryptedStore.shared.fetchAll()
+            var rotated: [EncryptedOTPAccount] = []
+            rotated.reserveCapacity(encrypted.count)
+
+            for item in encrypted {
+                let payload = try decryptPayload(for: item)
+                let recordVersion = EncryptedOTPAccount.currentVersion
+                let blob = try CryptoManager.encrypt(
+                    payload,
+                    using: newKey,
+                    associatedData: CryptoManager.associatedData(
+                        for: item.id,
+                        version: recordVersion,
+                        keyVersion: newVersion
+                    )
+                )
+
+                rotated.append(EncryptedOTPAccount(
+                    id: item.id,
+                    encryptedBlob: blob,
+                    version: recordVersion,
+                    keyVersion: newVersion,
+                    createdAt: item.createdAt,
+                    updatedAt: .now
+                ))
+            }
+
+            // Replace the local vault before making the new version current.
+            try await LocalEncryptedStore.shared.replaceAll(rotated)
+
+            // Keep both keys available while queued uploads are sent.
+            masterKeys[newVersion] = newKey
+
+            for item in rotated {
+                try await queueUpload(item)
+            }
+
+            currentKeyVersion = newVersion
+            await KeychainManager.shared.commitRotation(version: newVersion)
+
+            try await replaceAccounts(with: rotated)
+            startPendingUploads()
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
     func clearError() {
         lastError = nil
     }
 
     private func installLocalAccounts(
-        _ encrypted: [EncryptedOTPAccount],
-        using masterKey: SymmetricKey
+        _ encrypted: [EncryptedOTPAccount]
     ) async throws {
         let visible = encrypted.filter {
             !deletedIDs.contains($0.id.uuidString)
         }
         try await LocalEncryptedStore.shared.replaceAll(visible)
-        try await replaceAccounts(with: visible, using: masterKey)
+        try await replaceAccounts(with: visible)
     }
 
     private func queueUpload(_ item: EncryptedOTPAccount) async throws {
@@ -434,7 +521,7 @@ final class OTPStore: ObservableObject {
         return try await fetchRemoteAccounts()
     }
 
-    private func synchronizeCloud(using masterKey: SymmetricKey) async throws {
+    private func synchronizeCloud() async throws {
         let initialCloud = try await connectToCloud()
         guard let owner = cloudOwner else {
             throw OTPStoreError.cloudAccountUnavailable
@@ -456,11 +543,8 @@ final class OTPStore: ObservableObject {
             pendingUploads: remainingUploads,
             pendingDeletes: remainingDeletes
         )
-        let uniqueMerged = try await removeExactDuplicates(
-            from: merged,
-            using: masterKey
-        )
-        try await installLocalAccounts(uniqueMerged, using: masterKey)
+        let uniqueMerged = try await removeExactDuplicates(from: merged)
+        try await installLocalAccounts(uniqueMerged)
 
         // Duplicate cleanup and changes made while the first sync was in
         // flight may have added more queued work. Flush once more, then use
@@ -479,7 +563,7 @@ final class OTPStore: ObservableObject {
             pendingUploads: finalUploads,
             pendingDeletes: finalDeletes
         )
-        try await installLocalAccounts(finalMerged, using: masterKey)
+        try await installLocalAccounts(finalMerged)
         syncMessage = nil
     }
 
@@ -536,7 +620,7 @@ final class OTPStore: ObservableObject {
     }
 
     func startPendingUploads() {
-        guard isCloudSyncEnabled, isReady, let masterKey else { return }
+        guard isCloudSyncEnabled, isReady, masterKey != nil else { return }
         if syncTask != nil {
             syncRequested = true
             return
@@ -545,7 +629,7 @@ final class OTPStore: ObservableObject {
         syncTask = Task {
             var failed = false
             do {
-                try await synchronizeCloud(using: masterKey)
+                try await synchronizeCloud()
             } catch {
                 failed = true
                 // The local vault stays ready and usable. This status is

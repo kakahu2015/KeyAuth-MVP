@@ -24,11 +24,14 @@ struct ContentView: View {
             }
         }
         .onChange(of: appLock.isLocked) { _, isLocked in
-            guard !isLocked, let masterKey = appLock.consumeMasterKey() else {
+            guard !isLocked, let keyring = appLock.consumeKeyring() else {
                 return
             }
             Task {
-                let unlocked = await store.unlock(with: masterKey)
+                let unlocked = await store.unlock(
+                    keys: keyring.keys,
+                    currentVersion: keyring.currentVersion
+                )
                 if !unlocked {
                     appLock.lock()
                     store.lock()
