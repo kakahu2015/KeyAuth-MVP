@@ -179,6 +179,39 @@ actor KeychainManager {
         UserDefaults.standard.removeObject(forKey: pendingRotationKey)
     }
 
+    func deleteMasterKey(version: Int) throws {
+        let currentVersion = currentMasterKeyVersion()
+
+        // Only an obsolete key may be deleted. Never delete the current or a
+        // future version.
+        guard version < currentVersion else {
+            return
+        }
+
+#if targetEnvironment(simulator)
+        UserDefaults.standard.removeObject(
+            forKey: simulatorStorageKey(for: version)
+        )
+#else
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service(for: version),
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unexpectedStatus(status)
+        }
+#endif
+
+        var versions = knownKeyVersions()
+        versions.removeAll { $0 == version }
+        UserDefaults.standard.set(versions, forKey: knownKeyVersionsKey)
+    }
+
     private func makeKey(from data: Data) throws -> SymmetricKey {
         guard data.count == 32 else {
             throw KeychainError.malformedKeyData

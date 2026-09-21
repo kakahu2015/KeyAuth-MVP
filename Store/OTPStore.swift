@@ -564,7 +564,68 @@ final class OTPStore: ObservableObject {
             pendingDeletes: finalDeletes
         )
         try await installLocalAccounts(finalMerged)
+
+        try await cleanupOldMasterKeysIfSafe(
+            local: finalMerged,
+            remote: finalCloud.accounts,
+            remoteIsAuthoritative: finalCloud.isAuthoritative,
+            pendingUploads: finalUploads,
+            pendingDeletes: finalDeletes
+        )
+
         syncMessage = nil
+    }
+
+    private func cleanupOldMasterKeysIfSafe(
+        local: [EncryptedOTPAccount],
+        remote: [EncryptedOTPAccount],
+        remoteIsAuthoritative: Bool,
+        pendingUploads: [EncryptedOTPAccount],
+        pendingDeletes: Set<UUID>
+    ) async throws {
+        // Only a trusted complete CloudKit result can authorize key cleanup.
+        guard remoteIsAuthoritative else {
+            return
+        }
+
+        // Never delete an old key while any encrypted change is still pending.
+        guard pendingUploads.isEmpty,
+              pendingDeletes.isEmpty else {
+            return
+        }
+
+        // Every local record must already use the current key.
+        guard local.allSatisfy({
+            $0.keyVersion == currentKeyVersion
+        }) else {
+            return
+        }
+
+        // Every cloud record must also use the current key.
+        guard remote.allSatisfy({
+            $0.keyVersion == currentKeyVersion
+        }) else {
+            return
+        }
+
+        // The two complete snapshots must contain the same records. This
+        // prevents deleting an old key when CloudKit returned too few items.
+        let localIDs = Set(local.map(\.id))
+        let remoteIDs = Set(remote.map(\.id))
+        guard localIDs == remoteIDs else {
+            return
+        }
+
+        let versions = await KeychainManager.shared.knownKeyVersions()
+        let obsoleteVersions = versions.filter {
+            $0 < currentKeyVersion
+        }
+
+        for version in obsoleteVersions {
+            try await KeychainManager.shared
+                .deleteMasterKey(version: version)
+            masterKeys.removeValue(forKey: version)
+        }
     }
 
     private func flushPendingChanges(owner: String) async throws {
