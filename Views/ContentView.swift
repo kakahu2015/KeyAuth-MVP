@@ -20,8 +20,19 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 appLock.lock()
-            } else if newPhase == .active {
-                store.startPendingUploads()
+                store.lock()
+            }
+        }
+        .onChange(of: appLock.isLocked) { _, isLocked in
+            guard !isLocked, let masterKey = appLock.consumeMasterKey() else {
+                return
+            }
+            Task {
+                let unlocked = await store.unlock(with: masterKey)
+                if !unlocked {
+                    appLock.lock()
+                    store.lock()
+                }
             }
         }
         .alert(
@@ -187,7 +198,7 @@ private struct LockView: View {
             Text("KeyAuth is locked")
                 .font(.title2.weight(.semibold))
 
-            Text("Unlock with Face ID or your device passcode.")
+            Text("Unlock the protected master key with Face ID or your device passcode.")
                 .foregroundStyle(.secondary)
 
             Button {
@@ -199,11 +210,6 @@ private struct LockView: View {
                 )
             }
             .buttonStyle(.borderedProminent)
-            .disabled(appLock.isAuthenticating)
-
-            Button("使用设备密码") {
-                appLock.authenticate(usePasscode: true)
-            }
             .disabled(appLock.isAuthenticating)
 
             if let error = appLock.lastError {

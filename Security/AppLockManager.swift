@@ -1,6 +1,6 @@
+import CryptoKit
 import Foundation
-import LocalAuthentication
-import Security
+@preconcurrency import LocalAuthentication
 import UIKit
 
 @MainActor
@@ -11,8 +11,11 @@ final class AppLockManager: ObservableObject {
 
     private var context: LAContext?
     private var attemptID: UUID?
+    private var pendingMasterKey: SymmetricKey?
 
-    func authenticate(usePasscode: Bool = false) {
+    /// The system authentication is performed by the protected Keychain
+    /// query itself. The UI does not unlock until that query returns the key.
+    func authenticate() {
         guard isLocked, !isAuthenticating,
               UIApplication.shared.applicationState == .active else { return }
 
@@ -23,51 +26,53 @@ final class AppLockManager: ObservableObject {
         isAuthenticating = true
         lastError = nil
 
-        let reply: @Sendable (Bool, Error?) -> Void = { [weak self] success, error in
-            Task { @MainActor in
+        Task { @MainActor [weak self] in
+            do {
+                var masterKey = try await KeychainManager.shared.readMasterKey(
+                    context: context
+                )
+
+                if masterKey == nil {
+                    // First launch: create the device-bound item, then read it
+                    // through the same authenticated Keychain path. The key
+                    // is never handed to the app before that read succeeds.
+                    _ = try await KeychainManager.shared.createMasterKey()
+                    masterKey = try await KeychainManager.shared.readMasterKey(
+                        context: context
+                    )
+                }
+
+                guard let self,
+                      self.attemptID == id,
+                      let masterKey
+                else { return }
+
+                self.pendingMasterKey = masterKey
+                self.attemptID = nil
+                self.context = nil
+                self.isAuthenticating = false
+                self.isLocked = false
+            } catch {
                 guard let self, self.attemptID == id else { return }
                 self.attemptID = nil
                 self.context = nil
                 self.isAuthenticating = false
-                if success {
-                    self.isLocked = false
-                } else if let error {
-                    let nsError = error as NSError
-                    self.lastError = "解锁未完成，请重试或选择使用设备密码。\n\(nsError.domain) (\(nsError.code))"
-                }
+                let nsError = error as NSError
+                self.lastError = "解锁未完成，请重试。\n\(nsError.domain) (\(nsError.code))"
             }
         }
+    }
 
-        if usePasscode {
-            var error: Unmanaged<CFError>?
-            guard let access = SecAccessControlCreateWithFlags(
-                nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-                .devicePasscode, &error
-            ) else {
-                attemptID = nil
-                self.context = nil
-                isAuthenticating = false
-                lastError = "无法创建设备密码认证，请确认已设置锁屏密码。"
-                return
-            }
-            context.evaluateAccessControl(
-                access, operation: .useItem,
-                localizedReason: "输入设备锁屏密码以解锁 KeyAuth。",
-                reply: reply
-            )
-        } else {
-            context.evaluatePolicy(
-                .deviceOwnerAuthentication,
-                localizedReason: "解锁 KeyAuth 以查看验证码。",
-                reply: reply
-            )
-        }
+    func consumeMasterKey() -> SymmetricKey? {
+        defer { pendingMasterKey = nil }
+        return pendingMasterKey
     }
 
     func lock() {
         attemptID = nil
         context?.invalidate()
         context = nil
+        pendingMasterKey = nil
         isLocked = true
         isAuthenticating = false
     }

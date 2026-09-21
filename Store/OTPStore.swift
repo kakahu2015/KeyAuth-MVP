@@ -4,7 +4,6 @@ import CloudKit
 
 enum OTPStoreError: LocalizedError {
     case cloudAccountUnavailable
-    case masterKeySyncPending
     case masterKeyUnavailable
     case accountNotFound
     case undecryptableRecord
@@ -12,9 +11,7 @@ enum OTPStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .cloudAccountUnavailable:
-            return "Sign in to iCloud and enable iCloud Keychain before using KeyAuth sync."
-        case .masterKeySyncPending:
-            return "The iCloud Keychain key has not arrived yet. Keep iCloud Keychain enabled and try again later."
+            return "Sign in to iCloud before using KeyAuth sync."
         case .masterKeyUnavailable:
             return "The KeyAuth master key is unavailable."
         case .accountNotFound:
@@ -62,56 +59,52 @@ final class OTPStore: ObservableObject {
         lastError = nil
         syncMessage = nil
         isReady = false
-        defer { isLoading = false }
+        masterKey = nil
+        accounts = []
+        cloudOwner = UserDefaults.standard.string(forKey: cloudOwnerKey)
+        isCloudSyncEnabled = await CloudKitManager.shared.isConfigured
+        isLoading = false
+    }
+
+    @discardableResult
+    func unlock(with key: SymmetricKey) async -> Bool {
+        await syncTask?.value
+        isLoading = true
+        lastError = nil
+        syncMessage = nil
+        masterKey = key
+        isReady = false
 
         do {
-            isCloudSyncEnabled = await CloudKitManager.shared.isConfigured
-            cloudOwner = UserDefaults.standard.string(forKey: cloudOwnerKey)
-
             let localEncrypted = try await LocalEncryptedStore.shared.fetchAll()
-            if let existingKey = try await KeychainManager.shared.readMasterKey() {
-                masterKey = existingKey
-            } else {
-                guard isCloudSyncEnabled else {
-                    masterKey = try await KeychainManager.shared.createMasterKey()
-                    try await LocalEncryptedStore.shared.replaceAll([])
-                    isReady = true
-                    return
-                }
-
-                // A new device has no local vault yet. Only this recovery path
-                // needs CloudKit before the local vault can become available.
-                let cloud = try await connectToCloud()
-                guard cloud.accounts.isEmpty else {
-                    // If CloudKit has ciphertext but the synchronizable key has
-                    // not arrived, never generate a second key for the vault.
-                    throw OTPStoreError.masterKeySyncPending
-                }
-                masterKey = try await KeychainManager.shared.createMasterKey()
-            }
-
-            guard let masterKey else {
-                throw OTPStoreError.masterKeyUnavailable
-            }
-
             let uniqueEncrypted = try await removeExactDuplicates(
                 from: localEncrypted,
-                using: masterKey
+                using: key
             )
-            let visibleEncrypted = uniqueEncrypted.filter {
-                !deletedIDs.contains($0.id.uuidString)
-            }
-            try await installLocalAccounts(
-                visibleEncrypted,
-                using: masterKey
-            )
+            try await installLocalAccounts(uniqueEncrypted, using: key)
             isReady = true
+            isLoading = false
             startPendingUploads()
+            return true
         } catch {
             masterKey = nil
             accounts = []
+            isReady = false
+            isLoading = false
             lastError = error.localizedDescription
+            return false
         }
+    }
+
+    func lock() {
+        syncTask?.cancel()
+        syncTask = nil
+        syncRequested = false
+        masterKey = nil
+        accounts = []
+        isReady = false
+        isLoading = false
+        syncMessage = nil
     }
 
     func refresh() async throws {

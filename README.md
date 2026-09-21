@@ -6,7 +6,7 @@ A SwiftUI TOTP authenticator prototype using an application-level E2EE design:
 - TOTP secrets and account metadata are encrypted **on-device**
 - Encryption: AES-256-GCM via CryptoKit
 - Master key: 32 random bytes
-- Master key storage: local Keychain item, synchronizable through iCloud Keychain for recovery
+- Master key storage: device-bound Keychain item protected by `userPresence`
 - Optional backup/sync: CloudKit private database
 - CloudKit receives only an encrypted blob plus minimal sync metadata
 - No application server
@@ -140,25 +140,25 @@ immediately and queues the encrypted CloudKit deletion.
 
 ## Moving to another device
 
-KeyAuth restores the vault through two iCloud services:
+P0 deliberately binds the master key to the current device with
+`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` and a `userPresence` access
+control. CloudKit stores only encrypted account records, so those records
+cannot be decrypted on a new device by themselves.
 
-1. CloudKit private database stores the encrypted account records.
-2. iCloud Keychain synchronizes the AES master key; the key is never uploaded
-   to CloudKit.
+When upgrading an existing installation, the first authenticated unlock
+migrates the previous synchronizable v1 key into the new device-bound v2
+Keychain item. A future recovery implementation must add an independent
+Recovery Key wrapper for the vault key; the raw master key must not be synced
+directly again.
 
-On the new device, sign in with the same Apple Account, enable iCloud Keychain,
-install the same KeyAuth build, and launch it. Remaining cloud accounts load
-automatically. If iCloud Keychain has not finished synchronizing, retry loading.
-After recovery, the new device also has a local primary vault and can generate
-codes offline. Deleting an account removes it locally immediately and queues
-the CloudKit deletion; after it syncs, it cannot be restored by reinstalling
-the app. Uninstalling the app does not delete CloudKit records.
-A different Apple Account, disabled iCloud Keychain, or an
-undeployed Production CloudKit schema cannot restore the vault.
+After a device has been provisioned, it has a local primary vault and can
+generate codes offline. Deleting an account removes it locally immediately and
+queues the CloudKit deletion; after it syncs, it cannot be restored by
+reinstalling the app. Uninstalling the app does not delete CloudKit records.
 
-This is encrypted iCloud sync/recovery, not a plaintext export. The current
-debug build uses the Development CloudKit environment; a release build must
-deploy the schema to Production and use the Production environment.
+This is encrypted iCloud backup/sync, not a plaintext export. The current debug
+build uses the Development CloudKit environment; a release build must deploy
+the schema to Production and use the Production environment.
 
 ## Security notes before production
 
@@ -168,8 +168,8 @@ Still required before release:
 
 - Apple Team signing and a real iCloud container
 - development CloudKit schema creation and production deployment
-- real-device testing with iCloud Keychain and at least two devices
-- key recovery / multi-device bootstrap policy beyond the safe wait state
+- real-device testing of the protected Keychain item and authentication flow
+- Recovery Key wrapping and multi-device bootstrap policy
 - key rotation
 - CloudKit change subscriptions and conflict handling
 - secure clipboard behavior for any future copy action
@@ -180,6 +180,8 @@ Still required before release:
 
 ## Important recovery property
 
-Because the master key lives only in the user's synchronizable Keychain, deleting all trusted devices / losing access to iCloud Keychain may make the CloudKit ciphertext unrecoverable.
+Because the P0 master key is device-bound, deleting the trusted device may make
+the CloudKit ciphertext unrecoverable until the independent Recovery Key
+mechanism is implemented.
 
 That is intentional for a zero-knowledge design, but the production app must explain this clearly and provide a carefully designed recovery mechanism.
