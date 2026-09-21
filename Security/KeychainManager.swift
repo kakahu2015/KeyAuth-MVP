@@ -63,16 +63,14 @@ actor KeychainManager {
     /// Creates a new device-bound master key. Callers must immediately read it
     /// through readMasterKey(context:) so the newly-created userPresence item
     /// performs the system authentication before the key is used.
-    func createMasterKey() throws -> SymmetricKey {
+    func createMasterKey() throws {
         let data = try randomKeyData()
 #if targetEnvironment(simulator)
         // Unsigned simulator builds cannot use the real Keychain entitlement;
         // simulator storage is deliberately local-only development storage.
         UserDefaults.standard.set(data, forKey: simulatorStorageKey)
-        return try makeKey(from: data)
 #else
         _ = try storeProtectedMasterKeyData(data)
-        return try makeKey(from: data)
 #endif
     }
 

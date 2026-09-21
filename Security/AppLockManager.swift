@@ -36,7 +36,7 @@ final class AppLockManager: ObservableObject {
                     // First launch: create the device-bound item, then read it
                     // through the same authenticated Keychain path. The key
                     // is never handed to the app before that read succeeds.
-                    _ = try await KeychainManager.shared.createMasterKey()
+                    try await KeychainManager.shared.createMasterKey()
                     masterKey = try await KeychainManager.shared.readMasterKey(
                         context: context
                     )
