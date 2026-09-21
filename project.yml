@@ -1,0 +1,48 @@
+name: KeyAuth
+
+options:
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    PRODUCT_BUNDLE_IDENTIFIER: org.kakahu.KeyAuth
+    KEYAUTH_CLOUD_CONTAINER: iCloud.org.kakahu.KeyAuth
+    DEVELOPMENT_TEAM: 5C6T6Y2Y22
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+targets:
+  KeyAuth:
+    type: application
+    platform: iOS
+    sources:
+      - path: Cloud
+      - path: Models
+      - path: OTP
+      - path: Security
+      - path: Store
+      - path: Views
+      - path: KeyAuthApp.swift
+    info:
+      path: Info.plist
+      properties:
+        NSCameraUsageDescription: KeyAuth uses the camera to scan TOTP QR codes.
+        NSFaceIDUsageDescription: KeyAuth uses Face ID or your device passcode to protect verification codes.
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    entitlements:
+      path: KeyAuth.entitlements
+      properties:
+        com.apple.developer.icloud-container-environment: Development
+        com.apple.developer.icloud-container-identifiers:
+          - $(KEYAUTH_CLOUD_CONTAINER)
+        com.apple.developer.icloud-services:
+          - CloudKit
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)
