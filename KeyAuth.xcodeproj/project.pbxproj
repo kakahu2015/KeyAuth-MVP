@@ -10,6 +10,7 @@
 		0A5CB94FD0A670914A7E3654 /* AddAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3E082D14A2C0B503A2A3B2D /* AddAccountView.swift */; };
 		2A1D8F5669C3DD5F90C6E444 /* LocalEncryptedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3B3CBAE1D3FAE61D02733D /* LocalEncryptedStore.swift */; };
 		2FAAD21F0FE43DF44CC81C47 /* CloudKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E390A3700FAEAB320AF139 /* CloudKitManager.swift */; };
+		3E8564E2E3088606F83F7395 /* RecoveryEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E7F552EB228E5ADF245F7C /* RecoveryEnvelope.swift */; };
 		629E461AA7DACA0011D7AE5E /* CryptoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D0DE52196F5534ACF8266A /* CryptoManager.swift */; };
 		6314A3B8C1636541590EECED /* OTPStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78792140EA8C0F636481483 /* OTPStore.swift */; };
 		6B1A81A32C40B93B75EFE842 /* OTPAuthParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D892C3CB71B13AF32F028767 /* OTPAuthParser.swift */; };
@@ -17,15 +18,18 @@
 		7D4953F130577DCCFD4863A3 /* Base32.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A66AB2D8FD8EAE643AEE81 /* Base32.swift */; };
 		89B05F4E2568F4FFCA0147C8 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71DE2F9C83832F434BA9372B /* KeychainManager.swift */; };
 		9CEE86ECAB30303FAF17A234 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC7E63B8585086D0164181D /* QRScannerView.swift */; };
+		A36AF16349982F9AAF5E8757 /* RecoveryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E99DD5E0C6595C4D495905 /* RecoveryManager.swift */; };
 		B0539402AD6AF1F980932199 /* EditAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D8BA819C66E148B4E25860 /* EditAccountView.swift */; };
 		B2208AEF693EA92AB887901A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7ED4196A763A997D6C95047 /* ContentView.swift */; };
 		B24C610EB49E06962C478F68 /* AppLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F097588EB75D85C254C2CC78 /* AppLockManager.swift */; };
 		DEA2C17CB50E4505A5140C9E /* TOTPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282CEB991B314F13094C46EF /* TOTPManager.swift */; };
+		EF28774918FE5290D74935F2 /* RecoverySetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C0EFEAAF5E1C23957D7042 /* RecoverySetupView.swift */; };
 		F4629FBDD2BD76E9966A8474 /* KeyAuthApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0AF47CA6D762C4F1A7B47E2 /* KeyAuthApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		02A66AB2D8FD8EAE643AEE81 /* Base32.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Base32.swift; sourceTree = "<group>"; };
+		18C0EFEAAF5E1C23957D7042 /* RecoverySetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverySetupView.swift; sourceTree = "<group>"; };
 		19E390A3700FAEAB320AF139 /* CloudKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitManager.swift; sourceTree = "<group>"; };
 		282CEB991B314F13094C46EF /* TOTPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TOTPManager.swift; sourceTree = "<group>"; };
 		2E8F762243387EDA5B1735A2 /* OTPAccount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPAccount.swift; sourceTree = "<group>"; };
@@ -35,8 +39,10 @@
 		7FC7E63B8585086D0164181D /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		8A3B3CBAE1D3FAE61D02733D /* LocalEncryptedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEncryptedStore.swift; sourceTree = "<group>"; };
 		A7ED4196A763A997D6C95047 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A9E7F552EB228E5ADF245F7C /* RecoveryEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryEnvelope.swift; sourceTree = "<group>"; };
 		D892C3CB71B13AF32F028767 /* OTPAuthParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPAuthParser.swift; sourceTree = "<group>"; };
 		E0AF47CA6D762C4F1A7B47E2 /* KeyAuthApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyAuthApp.swift; sourceTree = "<group>"; };
+		E1E99DD5E0C6595C4D495905 /* RecoveryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryManager.swift; sourceTree = "<group>"; };
 		E3E082D14A2C0B503A2A3B2D /* AddAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountView.swift; sourceTree = "<group>"; };
 		F097588EB75D85C254C2CC78 /* AppLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockManager.swift; sourceTree = "<group>"; };
 		F275264BB696FBD4F3AE1F3E /* KeyAuth.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KeyAuth.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -62,6 +68,7 @@
 			isa = PBXGroup;
 			children = (
 				2E8F762243387EDA5B1735A2 /* OTPAccount.swift */,
+				A9E7F552EB228E5ADF245F7C /* RecoveryEnvelope.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -82,6 +89,7 @@
 				F097588EB75D85C254C2CC78 /* AppLockManager.swift */,
 				73D0DE52196F5534ACF8266A /* CryptoManager.swift */,
 				71DE2F9C83832F434BA9372B /* KeychainManager.swift */,
+				E1E99DD5E0C6595C4D495905 /* RecoveryManager.swift */,
 			);
 			path = Security;
 			sourceTree = "<group>";
@@ -93,6 +101,7 @@
 				A7ED4196A763A997D6C95047 /* ContentView.swift */,
 				56D8BA819C66E148B4E25860 /* EditAccountView.swift */,
 				7FC7E63B8585086D0164181D /* QRScannerView.swift */,
+				18C0EFEAAF5E1C23957D7042 /* RecoverySetupView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -195,6 +204,9 @@
 				6B1A81A32C40B93B75EFE842 /* OTPAuthParser.swift in Sources */,
 				6314A3B8C1636541590EECED /* OTPStore.swift in Sources */,
 				9CEE86ECAB30303FAF17A234 /* QRScannerView.swift in Sources */,
+				3E8564E2E3088606F83F7395 /* RecoveryEnvelope.swift in Sources */,
+				A36AF16349982F9AAF5E8757 /* RecoveryManager.swift in Sources */,
+				EF28774918FE5290D74935F2 /* RecoverySetupView.swift in Sources */,
 				DEA2C17CB50E4505A5140C9E /* TOTPManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

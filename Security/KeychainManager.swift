@@ -32,6 +32,8 @@ actor KeychainManager {
     private let currentKeyVersionKey = "KeyAuth.MasterKey.CurrentVersion"
     private let knownKeyVersionsKey = "KeyAuth.MasterKey.KnownVersions"
     private let pendingRotationKey = "KeyAuth.MasterKey.PendingRotation"
+    private let recoveryService = "KeyAuth.RecoveryKey.v1"
+    private let simulatorRecoveryKey = "KeyAuth.SimulatorRecoveryKey.v1"
 
     func currentMasterKeyVersion() -> Int {
         let value = UserDefaults.standard.integer(forKey: currentKeyVersionKey)
@@ -210,6 +212,112 @@ actor KeychainManager {
         var versions = knownKeyVersions()
         versions.removeAll { $0 == version }
         UserDefaults.standard.set(versions, forKey: knownKeyVersionsKey)
+    }
+
+    func readRecoveryKey(context: LAContext) throws -> SymmetricKey? {
+#if targetEnvironment(simulator)
+        guard let data = UserDefaults.standard.data(
+            forKey: simulatorRecoveryKey
+        ) else {
+            return nil
+        }
+
+        return try makeKey(from: data)
+#else
+        context.localizedReason = "解锁 KeyAuth 恢复密钥。"
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: recoveryService,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true,
+            kSecUseAuthenticationContext as String: context
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        switch status {
+        case errSecSuccess:
+            guard let data = item as? Data else {
+                throw KeychainError.malformedKeyData
+            }
+
+            return try makeKey(from: data)
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw KeychainError.unexpectedStatus(status)
+        }
+#endif
+    }
+
+    func storeRecoveryKey(_ data: Data) throws {
+        guard data.count == 32 else {
+            throw KeychainError.malformedKeyData
+        }
+
+#if targetEnvironment(simulator)
+        UserDefaults.standard.set(data, forKey: simulatorRecoveryKey)
+#else
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: recoveryService,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+
+        let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+        guard deleteStatus == errSecSuccess ||
+              deleteStatus == errSecItemNotFound
+        else {
+            throw KeychainError.unexpectedStatus(deleteStatus)
+        }
+
+        _ = try storeProtectedMasterKeyData(
+            data,
+            service: recoveryService
+        )
+#endif
+    }
+
+    func installRecoveredKeyring(
+        _ keys: [Int: Data],
+        currentVersion: Int
+    ) throws {
+        guard currentVersion > 0,
+              keys[currentVersion] != nil,
+              !keys.isEmpty
+        else {
+            throw KeychainError.malformedKeyData
+        }
+
+        for (version, data) in keys {
+            guard version > 0, data.count == 32 else {
+                throw KeychainError.malformedKeyData
+            }
+        }
+
+        for (version, data) in keys {
+#if targetEnvironment(simulator)
+            UserDefaults.standard.set(
+                data,
+                forKey: simulatorStorageKey(for: version)
+            )
+#else
+            _ = try storeProtectedMasterKeyData(
+                data,
+                service: service(for: version)
+            )
+#endif
+        }
+
+        let versions = keys.keys.sorted()
+        UserDefaults.standard.set(versions, forKey: knownKeyVersionsKey)
+        UserDefaults.standard.set(currentVersion, forKey: currentKeyVersionKey)
+        UserDefaults.standard.removeObject(forKey: pendingRotationKey)
     }
 
     private func makeKey(from data: Data) throws -> SymmetricKey {

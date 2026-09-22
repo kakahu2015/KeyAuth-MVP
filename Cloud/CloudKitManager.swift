@@ -26,6 +26,11 @@ actor CloudKitManager {
 
     private let container: CKContainer?
     private let recordType = "EncryptedOTP"
+    private let recoveryRecordType = "VaultRecovery"
+
+    private var recoveryRecordID: CKRecord.ID {
+        CKRecord.ID(recordName: "primary")
+    }
 
     init() {
         container = Self.makeConfiguredContainer()
@@ -96,6 +101,57 @@ actor CloudKitManager {
         _ = try await database.save(record)
     }
 
+    func saveRecoveryEnvelope(
+        _ envelope: RecoveryEnvelope
+    ) async throws {
+        let database = try configuredDatabase()
+        let record: CKRecord
+
+        do {
+            record = try await database.record(for: recoveryRecordID)
+        } catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(
+                recordType: recoveryRecordType,
+                recordID: recoveryRecordID
+            )
+        }
+
+        apply(envelope, to: record)
+
+        do {
+            _ = try await database.save(record)
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            let latest = try await database.record(for: recoveryRecordID)
+            apply(envelope, to: latest)
+            _ = try await database.save(latest)
+        }
+    }
+
+    func fetchRecoveryEnvelope() async throws -> RecoveryEnvelope? {
+        let database = try configuredDatabase()
+
+        do {
+            let record = try await database.record(for: recoveryRecordID)
+
+            guard let blob = record["blob"] as? Data,
+                  let formatVersion = record["formatVersion"] as? Int,
+                  let updatedAt = record["updatedAt"] as? Date
+            else {
+                throw CloudKitManagerError.malformedRecord(
+                    recoveryRecordID.recordName
+                )
+            }
+
+            return RecoveryEnvelope(
+                encryptedBlob: blob,
+                formatVersion: formatVersion,
+                updatedAt: updatedAt
+            )
+        } catch let error as CKError where error.code == .unknownItem {
+            return nil
+        }
+    }
+
     private func apply(_ item: EncryptedOTPAccount, to record: CKRecord) {
 
         // SECURITY BOUNDARY:
@@ -106,6 +162,12 @@ actor CloudKitManager {
         record["keyVersion"] = item.keyVersion as CKRecordValue
         record["createdAt"] = item.createdAt as CKRecordValue
         record["updatedAt"] = item.updatedAt as CKRecordValue
+    }
+
+    private func apply(_ envelope: RecoveryEnvelope, to record: CKRecord) {
+        record["blob"] = envelope.encryptedBlob as CKRecordValue
+        record["formatVersion"] = envelope.formatVersion as CKRecordValue
+        record["updatedAt"] = envelope.updatedAt as CKRecordValue
     }
 
     func fetchAll() async throws -> [EncryptedOTPAccount] {

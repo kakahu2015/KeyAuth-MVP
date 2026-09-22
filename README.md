@@ -18,7 +18,9 @@ CloudKit contains:
 - record UUID
 - AES-GCM ciphertext
 - schema version
+- master-key version
 - created/updated timestamps
+- an encrypted Recovery Envelope when cross-device recovery is enabled
 
 CloudKit does **not** contain plaintext:
 
@@ -28,6 +30,7 @@ CloudKit does **not** contain plaintext:
 - hash algorithm
 - digits
 - period
+- the raw Recovery Key
 
 The AES master key is never stored in CloudKit.
 
@@ -90,7 +93,18 @@ Fields:
 
 - `blob` : Bytes
 - `version` : Int(64)
+- `keyVersion` : Int(64)
 - `createdAt` : Date/Time
+- `updatedAt` : Date/Time
+
+When cross-device recovery is enabled, it also creates:
+
+`VaultRecovery`
+
+Fields:
+
+- `blob` : Bytes
+- `formatVersion` : Int(64)
 - `updatedAt` : Date/Time
 
 The app reads records by the `updatedAt` field rather than using a
@@ -147,9 +161,15 @@ cannot be decrypted on a new device by themselves.
 
 When upgrading an existing installation, the first authenticated unlock
 migrates the previous synchronizable v1 key into the new device-bound v2
-Keychain item. A future recovery implementation must add an independent
-Recovery Key wrapper for the vault key; the raw master key must not be synced
-directly again.
+Keychain item. Cross-device recovery can be enabled from the key button. The
+app generates a separate `KA1-…` Recovery Key, encrypts the local master-key
+ring with it, and stores only that encrypted Recovery Envelope in CloudKit.
+The Recovery Key itself is not uploaded and must be saved by the user.
+
+On a new device, enter the saved Recovery Key when prompted. The app decrypts
+the envelope, reinstalls the recovered master-key versions into the local
+device-bound Keychain, and still requires Face ID or the device passcode
+before opening the vault.
 
 After a device has been provisioned, it has a local primary vault and can
 generate codes offline. Deleting an account removes it locally immediately and
@@ -169,8 +189,7 @@ Still required before release:
 - Apple Team signing and a real iCloud container
 - development CloudKit schema creation and production deployment
 - real-device testing of the protected Keychain item and authentication flow
-- Recovery Key wrapping and multi-device bootstrap policy
-- key rotation
+- real-device recovery and key-rotation testing
 - CloudKit change subscriptions and conflict handling
 - secure clipboard behavior for any future copy action
 - migration and backup tests

@@ -6,12 +6,14 @@ import UIKit
 struct UnlockedKeyring {
     let currentVersion: Int
     let keys: [Int: SymmetricKey]
+    let recoveryKey: SymmetricKey?
 }
 
 @MainActor
 final class AppLockManager: ObservableObject {
     @Published private(set) var isLocked = true
     @Published private(set) var isAuthenticating = false
+    @Published private(set) var needsRecovery = false
     @Published private(set) var lastError: String?
 
     private var context: LAContext?
@@ -33,7 +35,7 @@ final class AppLockManager: ObservableObject {
 
         Task { @MainActor [weak self] in
             do {
-                let currentVersion = await KeychainManager.shared
+                var currentVersion = await KeychainManager.shared
                     .currentMasterKeyVersion()
                 var versions = await KeychainManager.shared.knownKeyVersions()
 
@@ -57,9 +59,26 @@ final class AppLockManager: ObservableObject {
                     }
                 }
 
-                // First launch: create v1, then read it through the protected
-                // Keychain query so the key is never used before auth.
+                // First launch: if a recovery envelope already exists, do not
+                // silently create a different vault on this device.
                 if keys.isEmpty, currentVersion == 1 {
+                    let hasRecovery = (try? await RecoveryManager.shared
+                        .cloudRecoveryExists()) ?? false
+
+                    if hasRecovery {
+                        guard let self,
+                              self.attemptID == id
+                        else {
+                            return
+                        }
+
+                        self.needsRecovery = true
+                        self.attemptID = nil
+                        self.context = nil
+                        self.isAuthenticating = false
+                        return
+                    }
+
                     try await KeychainManager.shared.createMasterKey()
                     if let key = try await KeychainManager.shared.readMasterKey(
                         version: 1,
@@ -69,13 +88,34 @@ final class AppLockManager: ObservableObject {
                     }
                 }
 
+                let recoveryKey = try await KeychainManager.shared
+                    .readRecoveryKey(context: context)
+
+                if let recoveryKey,
+                   let snapshot = try? await RecoveryManager.shared
+                    .fetchKeyring(recoveryKey: recoveryKey),
+                   keys[currentVersion] == nil ||
+                    snapshot.currentVersion > currentVersion {
+                    try await KeychainManager.shared.installRecoveredKeyring(
+                        snapshot.keyData,
+                        currentVersion: snapshot.currentVersion
+                    )
+
+                    for (version, data) in snapshot.keyData {
+                        keys[version] = SymmetricKey(data: data)
+                    }
+
+                    currentVersion = snapshot.currentVersion
+                }
+
                 guard keys[currentVersion] != nil else {
                     throw KeychainError.masterKeyUnavailable
                 }
 
                 let keyring = UnlockedKeyring(
                     currentVersion: currentVersion,
-                    keys: keys
+                    keys: keys,
+                    recoveryKey: recoveryKey
                 )
 
                 guard let self,
@@ -83,6 +123,7 @@ final class AppLockManager: ObservableObject {
                 else { return }
 
                 self.pendingKeyring = keyring
+                self.needsRecovery = false
                 self.attemptID = nil
                 self.context = nil
                 self.isAuthenticating = false
@@ -94,6 +135,38 @@ final class AppLockManager: ObservableObject {
                 self.isAuthenticating = false
                 let nsError = error as NSError
                 self.lastError = "解锁未完成，请重试。\n\(nsError.domain) (\(nsError.code))"
+            }
+        }
+    }
+
+    func recover(recoveryCode: String) {
+        guard isLocked, !isAuthenticating else {
+            return
+        }
+
+        isAuthenticating = true
+        lastError = nil
+
+        Task { @MainActor [weak self] in
+            do {
+                try await RecoveryManager.shared.restore(
+                    recoveryCode: recoveryCode
+                )
+
+                guard let self else {
+                    return
+                }
+
+                self.isAuthenticating = false
+                self.needsRecovery = false
+                self.authenticate()
+            } catch {
+                guard let self else {
+                    return
+                }
+
+                self.isAuthenticating = false
+                self.lastError = error.localizedDescription
             }
         }
     }

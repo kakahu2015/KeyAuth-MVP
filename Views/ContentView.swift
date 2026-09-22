@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var showAdd = false
+    @State private var showRecovery = false
     @State private var accountToEdit: OTPStore.DecryptedAccount?
     @State private var accountToDelete: OTPStore.DecryptedAccount?
 
@@ -30,7 +31,8 @@ struct ContentView: View {
             Task {
                 let unlocked = await store.unlock(
                     keys: keyring.keys,
-                    currentVersion: keyring.currentVersion
+                    currentVersion: keyring.currentVersion,
+                    recoveryKey: keyring.recoveryKey
                 )
                 if !unlocked {
                     appLock.lock()
@@ -134,6 +136,15 @@ struct ContentView: View {
             }
             .navigationTitle("KeyAuth")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showRecovery = true
+                    } label: {
+                        Image(systemName: "key.horizontal.fill")
+                    }
+                    .disabled(!store.isReady || store.isLoading)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showAdd = true
@@ -145,6 +156,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showAdd) {
                 AddAccountView()
+            }
+            .sheet(isPresented: $showRecovery) {
+                RecoverySetupView()
             }
             .sheet(item: $accountToEdit) { account in
                 EditAccountView(account: account)
@@ -191,6 +205,7 @@ private struct StorageModeLabel: View {
 
 private struct LockView: View {
     @EnvironmentObject private var appLock: AppLockManager
+    @State private var recoveryCode = ""
 
     var body: some View {
         VStack(spacing: 20) {
@@ -204,16 +219,36 @@ private struct LockView: View {
             Text("Unlock the protected master key with Face ID or your device passcode.")
                 .foregroundStyle(.secondary)
 
-            Button {
-                appLock.authenticate()
-            } label: {
-                Label(
-                    appLock.isAuthenticating ? "Unlocking…" : "Unlock",
-                    systemImage: "faceid"
+            if appLock.needsRecovery {
+                SecureField("KA1-恢复密钥", text: $recoveryCode)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    appLock.recover(recoveryCode: recoveryCode)
+                } label: {
+                    Label(
+                        "从 iCloud 恢复",
+                        systemImage: "icloud.and.arrow.down"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    recoveryCode.isEmpty || appLock.isAuthenticating
                 )
+            } else {
+                Button {
+                    appLock.authenticate()
+                } label: {
+                    Label(
+                        appLock.isAuthenticating ? "Unlocking…" : "Unlock",
+                        systemImage: "faceid"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(appLock.isAuthenticating)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(appLock.isAuthenticating)
 
             if let error = appLock.lastError {
                 Text(error)

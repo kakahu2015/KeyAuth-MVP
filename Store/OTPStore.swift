@@ -31,6 +31,7 @@ final class OTPStore: ObservableObject {
     @Published private(set) var isReady = false
     @Published private(set) var isCloudSyncEnabled = false
     @Published private(set) var syncMessage: String?
+    @Published private(set) var recoveryEnabled = false
 
     struct DecryptedAccount: Identifiable {
         let id: UUID
@@ -41,6 +42,7 @@ final class OTPStore: ObservableObject {
 
     private var masterKeys: [Int: SymmetricKey] = [:]
     private var currentKeyVersion = 1
+    private var recoveryKey: SymmetricKey?
 
     private var masterKey: SymmetricKey? {
         masterKeys[currentKeyVersion]
@@ -68,6 +70,8 @@ final class OTPStore: ObservableObject {
         isReady = false
         masterKeys = [:]
         currentKeyVersion = 1
+        recoveryKey = nil
+        recoveryEnabled = false
         accounts = []
         cloudOwner = UserDefaults.standard.string(forKey: cloudOwnerKey)
         isCloudSyncEnabled = await CloudKitManager.shared.isConfigured
@@ -77,7 +81,8 @@ final class OTPStore: ObservableObject {
     @discardableResult
     func unlock(
         keys: [Int: SymmetricKey],
-        currentVersion: Int
+        currentVersion: Int,
+        recoveryKey: SymmetricKey?
     ) async -> Bool {
         await syncTask?.value
         isLoading = true
@@ -85,6 +90,8 @@ final class OTPStore: ObservableObject {
         syncMessage = nil
         masterKeys = keys
         currentKeyVersion = currentVersion
+        self.recoveryKey = recoveryKey
+        recoveryEnabled = recoveryKey != nil
         isReady = false
 
         do {
@@ -103,6 +110,8 @@ final class OTPStore: ObservableObject {
             return true
         } catch {
             masterKeys = [:]
+            self.recoveryKey = nil
+            recoveryEnabled = false
             accounts = []
             isReady = false
             isLoading = false
@@ -116,6 +125,8 @@ final class OTPStore: ObservableObject {
         syncTask = nil
         syncRequested = false
         masterKeys = [:]
+        recoveryKey = nil
+        recoveryEnabled = false
         accounts = []
         isReady = false
         isLoading = false
@@ -412,6 +423,29 @@ final class OTPStore: ObservableObject {
     }
 
     @discardableResult
+    func enableRecovery() async -> String? {
+        lastError = nil
+
+        do {
+            guard isReady, masterKey != nil else {
+                throw OTPStoreError.masterKeyUnavailable
+            }
+
+            let result = try await RecoveryManager.shared.enableRecovery(
+                keys: masterKeys,
+                currentVersion: currentKeyVersion
+            )
+
+            recoveryKey = result.key
+            recoveryEnabled = true
+            return result.code
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    @discardableResult
     func rotateMasterKey(context: LAContext) async -> Bool {
         lastError = nil
 
@@ -422,6 +456,23 @@ final class OTPStore: ObservableObject {
 
             let (newVersion, newKey) = try await KeychainManager.shared
                 .createNextMasterKey(context: context)
+
+            var rotationKeyring = masterKeys
+            rotationKeyring[newVersion] = newKey
+
+            if let recoveryKey {
+                try await RecoveryManager.shared.updateEnvelope(
+                    recoveryKey: recoveryKey,
+                    keys: rotationKeyring,
+                    currentVersion: newVersion
+                )
+            } else if try await RecoveryManager.shared
+                .cloudRecoveryExists() {
+                // Recovery is enabled in CloudKit, but this device cannot
+                // update the envelope safely without its Recovery Key.
+                throw RecoveryError.recoveryKeyUnavailable
+            }
+
             let encrypted = try await LocalEncryptedStore.shared.fetchAll()
             var rotated: [EncryptedOTPAccount] = []
             rotated.reserveCapacity(encrypted.count)
@@ -521,13 +572,95 @@ final class OTPStore: ObservableObject {
         return try await fetchRemoteAccounts()
     }
 
+    private func refreshRecoveryKeyringIfNeeded() async throws {
+        guard let recoveryKey else {
+            return
+        }
+
+        do {
+            let snapshot = try await RecoveryManager.shared.fetchKeyring(
+                recoveryKey: recoveryKey
+            )
+
+            if snapshot.currentVersion > currentKeyVersion {
+                try await KeychainManager.shared.installRecoveredKeyring(
+                    snapshot.keyData,
+                    currentVersion: snapshot.currentVersion
+                )
+
+                for (version, data) in snapshot.keyData {
+                    masterKeys[version] = SymmetricKey(data: data)
+                }
+
+                currentKeyVersion = snapshot.currentVersion
+            } else if snapshot.currentVersion < currentKeyVersion {
+                // This device is ahead. Repair a stale envelope rather than
+                // downgrading the local vault or re-uploading old ciphertext.
+                try await RecoveryManager.shared.updateEnvelope(
+                    recoveryKey: recoveryKey,
+                    keys: masterKeys,
+                    currentVersion: currentKeyVersion
+                )
+            }
+        } catch RecoveryError.envelopeMissing {
+            // A local Recovery Key without an envelope can safely recreate it
+            // from the current in-memory key ring.
+            try await RecoveryManager.shared.updateEnvelope(
+                recoveryKey: recoveryKey,
+                keys: masterKeys,
+                currentVersion: currentKeyVersion
+            )
+        }
+    }
+
+    private func upgradePendingUploads(owner: String) async throws {
+        guard let currentKey = masterKey else {
+            throw OTPStoreError.masterKeyUnavailable
+        }
+
+        let pending = try await PendingCloudUploads.shared.fetch(owner: owner)
+
+        for item in pending where item.keyVersion != currentKeyVersion {
+            let payload = try decryptPayload(for: item)
+            let recordVersion = EncryptedOTPAccount.currentVersion
+            let blob = try CryptoManager.encrypt(
+                payload,
+                using: currentKey,
+                associatedData: CryptoManager.associatedData(
+                    for: item.id,
+                    version: recordVersion,
+                    keyVersion: currentKeyVersion
+                )
+            )
+
+            let migrated = EncryptedOTPAccount(
+                id: item.id,
+                encryptedBlob: blob,
+                version: recordVersion,
+                keyVersion: currentKeyVersion,
+                createdAt: item.createdAt,
+                // This is a re-encryption, not a user edit.
+                updatedAt: item.updatedAt
+            )
+
+            try await PendingCloudUploads.shared.save(
+                migrated,
+                owner: owner
+            )
+            try await LocalEncryptedStore.shared.save(migrated)
+        }
+    }
+
     private func synchronizeCloud() async throws {
+        try await refreshRecoveryKeyringIfNeeded()
+
         let initialCloud = try await connectToCloud()
         guard let owner = cloudOwner else {
             throw OTPStoreError.cloudAccountUnavailable
         }
 
         syncMessage = "正在同步 iCloud…"
+        try await upgradePendingUploads(owner: owner)
         try await flushPendingChanges(owner: owner)
 
         let latestCloud = try await fetchRemoteAccounts()
@@ -613,6 +746,24 @@ final class OTPStore: ObservableObject {
         let localIDs = Set(local.map(\.id))
         let remoteIDs = Set(remote.map(\.id))
         guard localIDs == remoteIDs else {
+            return
+        }
+
+        if let recoveryKey {
+            guard let currentKey = masterKey else {
+                throw OTPStoreError.masterKeyUnavailable
+            }
+
+            // The cloud is fully migrated; shrink the recovery envelope before
+            // removing obsolete device-bound keys.
+            try await RecoveryManager.shared.updateEnvelope(
+                recoveryKey: recoveryKey,
+                keys: [currentKeyVersion: currentKey],
+                currentVersion: currentKeyVersion
+            )
+        } else if try await RecoveryManager.shared.cloudRecoveryExists() {
+            // Recovery is enabled remotely, but this device cannot update the
+            // envelope. Keep the old keys rather than breaking recovery.
             return
         }
 
