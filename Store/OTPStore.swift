@@ -436,6 +436,11 @@ final class OTPStore: ObservableObject {
                 throw OTPStoreError.masterKeyUnavailable
             }
 
+            // Another iPhone may already have created the Recovery Envelope.
+            if try await RecoveryManager.shared.cloudRecoveryExists() {
+                throw RecoveryError.alreadyEnabled
+            }
+
             let result = try await RecoveryManager.shared.enableRecovery(
                 keys: masterKeys,
                 currentVersion: currentKeyVersion

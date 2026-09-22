@@ -8,6 +8,7 @@ enum RecoveryError: LocalizedError {
     case envelopeMissing
     case malformedEnvelope
     case recoveryKeyUnavailable
+    case alreadyEnabled
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,8 @@ enum RecoveryError: LocalizedError {
             return "恢复数据无效或已损坏。"
         case .recoveryKeyUnavailable:
             return "本机恢复密钥不可用。"
+        case .alreadyEnabled:
+            return "iCloud 恢复功能已经启用，不能重新生成恢复密钥。"
         }
     }
 }
