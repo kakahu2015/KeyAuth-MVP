@@ -426,6 +426,11 @@ final class OTPStore: ObservableObject {
     func enableRecovery() async -> String? {
         lastError = nil
 
+        guard !recoveryEnabled else {
+            lastError = "恢复功能已经启用，当前版本不支持重新生成恢复密钥。"
+            return nil
+        }
+
         do {
             guard isReady, masterKey != nil else {
                 throw OTPStoreError.masterKeyUnavailable

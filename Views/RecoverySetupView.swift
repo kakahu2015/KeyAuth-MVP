@@ -23,13 +23,17 @@ struct RecoverySetupView: View {
                         .padding()
                         .background(.secondary.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    Text(
-                        store.recoveryEnabled
-                            ? "重新生成恢复密钥后，旧恢复密钥立即失效。"
-                            : "生成恢复密钥后，可在新的 iPhone / iPad 上恢复。"
+                } else if store.recoveryEnabled {
+                    ContentUnavailableView(
+                        "恢复已启用",
+                        systemImage: "checkmark.shield.fill",
+                        description: Text(
+                            "恢复密钥已经配置。请妥善保管之前保存的恢复密钥。"
+                        )
                     )
-                    .foregroundStyle(.secondary)
+                } else {
+                    Text("生成恢复密钥后，可在新的 iPhone / iPad 上恢复。")
+                        .foregroundStyle(.secondary)
 
                     Button {
                         Task {
@@ -39,9 +43,7 @@ struct RecoverySetupView: View {
                         }
                     } label: {
                         Label(
-                            store.recoveryEnabled
-                                ? "重新生成恢复密钥"
-                                : "启用跨设备恢复",
+                            "启用跨设备恢复",
                             systemImage: "key.horizontal.fill"
                         )
                     }
