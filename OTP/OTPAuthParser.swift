@@ -13,21 +13,21 @@ enum OTPAuthParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid otpauth URL."
+            return String(localized: "Invalid otpauth URL.")
         case .unsupportedType:
-            return "Only TOTP is supported in this MVP."
+            return String(localized: "Only TOTP is supported in this MVP.")
         case .missingSecret:
-            return "The otpauth URL has no secret."
+            return String(localized: "The otpauth URL has no secret.")
         case .missingAccountName:
-            return "The otpauth URL has no account name."
+            return String(localized: "The otpauth URL has no account name.")
         case .duplicateParameter(let name):
-            return "The otpauth URL contains the parameter more than once: \(name)."
+            return String(localized: "The otpauth URL contains a parameter more than once:") + " \(name)."
         case .unsupportedAlgorithm(let algorithm):
-            return "Unsupported OTP algorithm: \(algorithm)."
+            return String(localized: "Unsupported OTP algorithm:") + " \(algorithm)."
         case .invalidDigits:
-            return "OTP digits must be 6, 7, or 8."
+            return String(localized: "OTP digits must be 6, 7, or 8.")
         case .invalidPeriod:
-            return "OTP period must be a positive number of seconds."
+            return String(localized: "OTP period must be a positive number of seconds.")
         }
     }
 }

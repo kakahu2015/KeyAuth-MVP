@@ -12,13 +12,15 @@ enum KeychainError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unexpectedStatus(let status):
-            return "Keychain error: \(status)"
+            return String(localized: "Keychain operation failed.") + " (\(status))"
         case .malformedKeyData:
-            return "Stored master key is malformed."
+            return String(localized: "Stored master key is malformed.")
         case .accessControlUnavailable:
-            return "This device needs a passcode to protect the KeyAuth master key."
+            return String(
+                localized: "This device needs a passcode to protect the KeyAuth master key."
+            )
         case .masterKeyUnavailable:
-            return "The KeyAuth master key could not be unlocked."
+            return String(localized: "The KeyAuth master key could not be unlocked.")
         }
     }
 }
@@ -224,7 +226,7 @@ actor KeychainManager {
 
         return try makeKey(from: data)
 #else
-        context.localizedReason = "解锁 KeyAuth 恢复密钥。"
+        context.localizedReason = String(localized: "Unlock KeyAuth recovery key.")
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -354,7 +356,7 @@ actor KeychainManager {
         version: Int,
         context: LAContext
     ) throws -> Data? {
-        context.localizedReason = "解锁 KeyAuth 以读取主密钥。"
+        context.localizedReason = String(localized: "Unlock KeyAuth to read the master key.")
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service(for: version),

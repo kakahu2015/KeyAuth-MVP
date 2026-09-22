@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "KeyAuth 會使用相機掃描 TOTP QR Code。";
+"NSFaceIDUsageDescription" = "KeyAuth 會使用 Face ID 或裝置密碼保護驗證碼。";

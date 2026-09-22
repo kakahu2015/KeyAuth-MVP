@@ -11,10 +11,12 @@ struct RecoverySetupView: View {
         NavigationStack {
             VStack(spacing: 20) {
                 if let recoveryCode {
-                    Text("请保存恢复密钥")
+                    Text("Please save your recovery key")
                         .font(.title2.bold())
 
-                    Text("丢失所有设备后，只能使用此密钥恢复验证码。")
+                    Text(
+                        "If you lose all devices, this key is the only way to recover your codes."
+                    )
                         .foregroundStyle(.secondary)
 
                     Text(recoveryCode)
@@ -25,14 +27,16 @@ struct RecoverySetupView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else if store.recoveryEnabled {
                     ContentUnavailableView(
-                        "恢复已启用",
+                        "Recovery enabled",
                         systemImage: "checkmark.shield.fill",
                         description: Text(
-                            "恢复密钥已经配置。请妥善保管之前保存的恢复密钥。"
+                            "A recovery key is configured. Keep the recovery key you saved previously safe."
                         )
                     )
                 } else {
-                    Text("生成恢复密钥后，可在新的 iPhone / iPad 上恢复。")
+                    Text(
+                        "After generating a recovery key, you can recover on a new iPhone or iPad."
+                    )
                         .foregroundStyle(.secondary)
 
                     Button {
@@ -43,7 +47,7 @@ struct RecoverySetupView: View {
                         }
                     } label: {
                         Label(
-                            "启用跨设备恢复",
+                            "Enable cross-device recovery",
                             systemImage: "key.horizontal.fill"
                         )
                     }
@@ -54,10 +58,10 @@ struct RecoverySetupView: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("恢复")
+            .navigationTitle("Recovery")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("Done") {
                         dismiss()
                     }
                 }

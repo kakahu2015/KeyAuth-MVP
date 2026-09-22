@@ -134,7 +134,9 @@ final class AppLockManager: ObservableObject {
                 self.context = nil
                 self.isAuthenticating = false
                 let nsError = error as NSError
-                self.lastError = "解锁未完成，请重试。\n\(nsError.domain) (\(nsError.code))"
+                self.lastError = String(
+                    localized: "Unlock did not complete. Please try again."
+                ) + "\n\(nsError.domain) (\(nsError.code))"
             }
         }
     }

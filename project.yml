@@ -26,6 +26,8 @@ targets:
       - path: Store
       - path: Views
       - path: KeyAuthApp.swift
+      - path: Assets.xcassets
+      - path: Localization
     info:
       path: Info.plist
       properties:

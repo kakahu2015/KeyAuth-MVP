@@ -12,13 +12,15 @@ enum OTPStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .cloudAccountUnavailable:
-            return "Sign in to iCloud before using KeyAuth sync."
+            return String(localized: "Sign in to iCloud before using KeyAuth sync.")
         case .masterKeyUnavailable:
-            return "The KeyAuth master key is unavailable."
+            return String(localized: "The KeyAuth master key is unavailable.")
         case .accountNotFound:
-            return "The account is no longer available. Refresh and try again."
+            return String(localized: "The account is no longer available. Refresh and try again.")
         case .undecryptableRecord:
-            return "A CloudKit account could not be decrypted. The app kept the data instead of hiding it."
+            return String(
+                localized: "A CloudKit account could not be decrypted. The app kept the data instead of hiding it."
+            )
         }
     }
 }
@@ -169,7 +171,7 @@ final class OTPStore: ObservableObject {
 
         if isCloudSyncEnabled {
             try await queueUpload(item)
-            syncMessage = "已保存到本机，正在同步 iCloud…"
+            syncMessage = String(localized: "Saved locally; syncing with iCloud…")
         }
     }
 
@@ -178,7 +180,7 @@ final class OTPStore: ObservableObject {
 
         if isCloudSyncEnabled {
             try await queueUpload(item)
-            syncMessage = "已保存到本机，正在同步 iCloud…"
+            syncMessage = String(localized: "Saved locally; syncing with iCloud…")
         }
     }
 
@@ -427,7 +429,9 @@ final class OTPStore: ObservableObject {
         lastError = nil
 
         guard !recoveryEnabled else {
-            lastError = "恢复功能已经启用，当前版本不支持重新生成恢复密钥。"
+            lastError = String(
+                localized: "Recovery feature is already enabled; this version does not support generating a new recovery key."
+            )
             return nil
         }
 
@@ -678,7 +682,7 @@ final class OTPStore: ObservableObject {
             throw OTPStoreError.cloudAccountUnavailable
         }
 
-        syncMessage = "正在同步 iCloud…"
+        syncMessage = String(localized: "Syncing with iCloud…")
         try await upgradePendingUploads(owner: owner)
         try await flushPendingChanges(owner: owner)
 
@@ -865,7 +869,9 @@ final class OTPStore: ObservableObject {
                 failed = true
                 // The local vault stays ready and usable. This status is
                 // intentionally non-blocking and can be retried by the user.
-                syncMessage = "本机数据可用，iCloud 尚未同步。点击重试。"
+                syncMessage = String(
+                    localized: "Your data is available on this device, but iCloud has not synced yet. Tap to retry."
+                )
             }
             syncTask = nil
             if syncRequested {

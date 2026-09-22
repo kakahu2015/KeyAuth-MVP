@@ -10,13 +10,13 @@ enum TOTPError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidSecret:
-            return "The OTP secret is invalid."
+            return String(localized: "The OTP secret is invalid.")
         case .invalidDigits:
-            return "OTP digits must be 6, 7, or 8."
+            return String(localized: "OTP digits must be 6, 7, or 8.")
         case .invalidPeriod:
-            return "OTP period must be positive."
+            return String(localized: "OTP period must be positive.")
         case .invalidDate:
-            return "The OTP date is invalid."
+            return String(localized: "The OTP date is invalid.")
         }
     }
 }

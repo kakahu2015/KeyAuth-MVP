@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "KeyAuth, TOTP QR kodlarını taramak için kamerayı kullanır.";
+"NSFaceIDUsageDescription" = "KeyAuth, doğrulama kodlarını korumak için Face ID veya aygıt parolasını kullanır.";

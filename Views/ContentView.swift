@@ -74,7 +74,7 @@ struct ContentView: View {
                                     await store.bootstrap()
                                 }
                             } label: {
-                                Label("重试加载", systemImage: "arrow.clockwise")
+                                Label("Retry loading", systemImage: "arrow.clockwise")
                             }
                             .buttonStyle(.bordered)
                             .disabled(store.isLoading)
@@ -182,7 +182,9 @@ struct ContentView: View {
                     accountToDelete = nil
                 }
             } message: {
-                Text("删除会立即移除本机账号，并在 iCloud 恢复连接后删除云端记录。同步完成后无法通过恢复找回。")
+                Text(
+                    "Deleting removes the account from this device immediately and deletes the cloud record after iCloud reconnects. It cannot be recovered after sync completes."
+                )
             }
         }
     }
@@ -192,10 +194,19 @@ private struct StorageModeLabel: View {
     let isCloudSyncEnabled: Bool
 
     var body: some View {
-        Label(
-            isCloudSyncEnabled ? "本机加密库 · iCloud 后台同步" : "本机加密库",
-            systemImage: isCloudSyncEnabled ? "icloud.fill" : "externaldrive.fill"
-        )
+        Group {
+            if isCloudSyncEnabled {
+                Label(
+                    "Local encrypted vault · iCloud background sync",
+                    systemImage: "icloud.fill"
+                )
+            } else {
+                Label(
+                    "Local encrypted vault",
+                    systemImage: "externaldrive.fill"
+                )
+            }
+        }
         .font(.footnote)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
@@ -220,7 +231,7 @@ private struct LockView: View {
                 .foregroundStyle(.secondary)
 
             if appLock.needsRecovery {
-                SecureField("KA1-恢复密钥", text: $recoveryCode)
+                SecureField("KA1-Recovery key", text: $recoveryCode)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
@@ -229,7 +240,7 @@ private struct LockView: View {
                     appLock.recover(recoveryCode: recoveryCode)
                 } label: {
                     Label(
-                        "从 iCloud 恢复",
+                        "Recover from iCloud",
                         systemImage: "icloud.and.arrow.down"
                     )
                 }
@@ -241,10 +252,11 @@ private struct LockView: View {
                 Button {
                     appLock.authenticate()
                 } label: {
-                    Label(
-                        appLock.isAuthenticating ? "Unlocking…" : "Unlock",
-                        systemImage: "faceid"
-                    )
+                    if appLock.isAuthenticating {
+                        Label("Unlocking…", systemImage: "faceid")
+                    } else {
+                        Label("Unlock", systemImage: "faceid")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(appLock.isAuthenticating)

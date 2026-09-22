@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "KeyAuth utilise l’appareil photo pour scanner les codes QR TOTP.";
+"NSFaceIDUsageDescription" = "KeyAuth utilise Face ID ou le code de votre appareil pour protéger les codes de vérification.";

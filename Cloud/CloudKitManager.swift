@@ -10,13 +10,15 @@ enum CloudKitManagerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "CloudKit is not configured for this build."
+            return String(localized: "CloudKit is not configured for this build.")
         case .recordTypeMissing(let recordType):
-            return "CloudKit record type \(recordType) is not available in the Development schema."
+            return String(
+                localized: "CloudKit record type is not available in the Development schema."
+            ) + " (\(recordType))"
         case .recordFetchFailed:
-            return "CloudKit returned a record that could not be read."
+            return String(localized: "CloudKit returned a record that could not be read.")
         case .malformedRecord(let recordName):
-            return "CloudKit record \(recordName) is malformed."
+            return String(localized: "CloudKit returned a malformed record.") + " (\(recordName))"
         }
     }
 }

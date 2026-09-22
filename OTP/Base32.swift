@@ -10,15 +10,15 @@ enum Base32Error: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .empty:
-            return "The Base32 secret is empty."
+            return String(localized: "The Base32 secret is empty.")
         case .invalidCharacter(let character):
-            return "The Base32 secret contains an invalid character: \(character)."
+            return String(localized: "The Base32 secret contains an invalid character:") + " \(character)."
         case .invalidLength:
-            return "The Base32 secret has an invalid length."
+            return String(localized: "The Base32 secret has an invalid length.")
         case .invalidPadding:
-            return "The Base32 secret has invalid padding."
+            return String(localized: "The Base32 secret has invalid padding.")
         case .nonZeroTrailingBits:
-            return "The Base32 secret has invalid trailing bits."
+            return String(localized: "The Base32 secret has invalid trailing bits.")
         }
     }
 }

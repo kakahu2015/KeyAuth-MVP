@@ -13,15 +13,17 @@ enum RecoveryError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidRecoveryKey:
-            return "恢复密钥无效。"
+            return String(localized: "Recovery key is invalid.")
         case .envelopeMissing:
-            return "iCloud 中没有恢复数据。"
+            return String(localized: "There is no recovery data in iCloud.")
         case .malformedEnvelope:
-            return "恢复数据无效或已损坏。"
+            return String(localized: "The recovery data is invalid or corrupted.")
         case .recoveryKeyUnavailable:
-            return "本机恢复密钥不可用。"
+            return String(localized: "The device recovery key is unavailable.")
         case .alreadyEnabled:
-            return "iCloud 恢复功能已经启用，不能重新生成恢复密钥。"
+            return String(
+                localized: "iCloud recovery is already enabled. A new recovery key cannot be generated."
+            )
         }
     }
 }

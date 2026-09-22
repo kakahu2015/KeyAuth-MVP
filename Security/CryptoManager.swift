@@ -7,7 +7,7 @@ enum CryptoManagerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidCombinedBox:
-            return "The encrypted account payload is invalid."
+            return String(localized: "The encrypted account payload is invalid.")
         }
     }
 }

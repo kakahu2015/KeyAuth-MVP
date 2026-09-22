@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "KeyAuth 使用相机扫描 TOTP 二维码。";
+"NSFaceIDUsageDescription" = "KeyAuth 使用 Face ID 或设备密码保护验证码。";
