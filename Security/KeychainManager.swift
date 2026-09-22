@@ -307,7 +307,7 @@ actor KeychainManager {
                 forKey: simulatorStorageKey(for: version)
             )
 #else
-            _ = try storeProtectedMasterKeyData(
+            try replaceProtectedMasterKeyData(
                 data,
                 service: service(for: version)
             )
@@ -431,6 +431,37 @@ actor KeychainManager {
             throw KeychainError.unexpectedStatus(status)
         }
         return data
+    }
+
+    private func replaceProtectedMasterKeyData(
+        _ data: Data,
+        service: String
+    ) throws {
+        guard data.count == 32 else {
+            throw KeychainError.malformedKeyData
+        }
+
+        // SecItemUpdate cannot reliably replace an existing item's
+        // kSecAttrAccessControl. Delete and re-add it so recovery always
+        // restores WhenPasscodeSetThisDeviceOnly + userPresence.
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+
+        let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+        guard deleteStatus == errSecSuccess ||
+              deleteStatus == errSecItemNotFound
+        else {
+            throw KeychainError.unexpectedStatus(deleteStatus)
+        }
+
+        _ = try storeProtectedMasterKeyData(
+            data,
+            service: service
+        )
     }
 
     private func deleteLegacyMasterKey() throws {

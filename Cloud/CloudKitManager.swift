@@ -121,9 +121,9 @@ actor CloudKitManager {
         do {
             _ = try await database.save(record)
         } catch let error as CKError where error.code == .serverRecordChanged {
-            let latest = try await database.record(for: recoveryRecordID)
-            apply(envelope, to: latest)
-            _ = try await database.save(latest)
+            // Recovery Envelope is key state. Do not use last-write-wins;
+            // the caller must fetch the latest keyring before deciding.
+            throw error
         }
     }
 

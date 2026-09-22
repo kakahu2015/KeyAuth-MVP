@@ -62,8 +62,8 @@ final class AppLockManager: ObservableObject {
                 // First launch: if a recovery envelope already exists, do not
                 // silently create a different vault on this device.
                 if keys.isEmpty, currentVersion == 1 {
-                    let hasRecovery = (try? await RecoveryManager.shared
-                        .cloudRecoveryExists()) ?? false
+                    let hasRecovery = try await RecoveryManager.shared
+                        .cloudRecoveryExists()
 
                     if hasRecovery {
                         guard let self,

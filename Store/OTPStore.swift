@@ -454,6 +454,15 @@ final class OTPStore: ObservableObject {
                 throw OTPStoreError.masterKeyUnavailable
             }
 
+            // Fetch the latest global keyring before allocating a new version.
+            // This prevents two devices from independently creating the same
+            // version number from stale state.
+            if isCloudSyncEnabled {
+                try await synchronizeCloud()
+            }
+
+            try await refreshRecoveryKeyringIfNeeded()
+
             let (newVersion, newKey) = try await KeychainManager.shared
                 .createNextMasterKey(context: context)
 
