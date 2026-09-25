@@ -44,7 +44,7 @@ struct RecoverySetupView: View {
                     )
                 } else {
                     Text(
-                        "After generating a recovery key, you can recover on a new iPhone or iPad."
+                        "After generating a recovery key, you can recover on a new iPhone."
                     )
                         .foregroundStyle(.secondary)
 
