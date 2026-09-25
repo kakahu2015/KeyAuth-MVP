@@ -1,0 +1,16 @@
+{
+  "name": "keyauth-official",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The official KeyAuth product website on Cloudflare Workers.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "types": "wrangler types",
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.136.2"
+  }
+}

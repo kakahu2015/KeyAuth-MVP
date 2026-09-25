@@ -1,0 +1,17 @@
+{
+  "name": "KeyAuth",
+  "short_name": "KeyAuth",
+  "description": "Your codes, your control. / 你的验证码，你的掌控。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07110f",
+  "theme_color": "#07110f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

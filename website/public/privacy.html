@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07110f" />
+    <meta id="meta-description" name="description" content="KeyAuth privacy: learn how local encryption, ciphertext-only iCloud sync, device keys, and website requests work." />
+    <meta id="og-title" property="og:title" content="KeyAuth — Privacy" />
+    <meta id="og-description" property="og:description" content="How KeyAuth handles local data, ciphertext-only iCloud sync, recovery keys, and website requests." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/styles.css?v=20260922-2" />
+    <script src="/script.js?v=20260922-2" defer></script>
+    <title id="page-title">KeyAuth — Privacy</title>
+  </head>
+  <body data-page="privacy">
+    <a class="skip-link" href="#main" data-i18n="skip_link">Skip to main content</a>
+    <div class="site-noise" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="/" aria-label="KeyAuth home" data-i18n-attr="aria-label:brand_aria">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <path d="M16 3.5 26 7v7.6c0 6.2-4.1 11.5-10 13.9C10.1 26.1 6 20.8 6 14.6V7l10-3.5Z" fill="currentColor" opacity=".18" />
+              <path d="M16 3.5 26 7v7.6c0 6.2-4.1 11.5-10 13.9C10.1 26.1 6 20.8 6 14.6V7l10-3.5Z" stroke="currentColor" stroke-width="1.7" />
+              <path d="m12.2 15.7 2.5 2.5 5.1-5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span>KeyAuth</span>
+        </a>
+
+        <nav class="desktop-nav" aria-label="Primary navigation" data-i18n-attr="aria-label:nav_aria">
+          <a href="/#security" data-i18n="nav_security">Security model</a>
+          <a href="/#flow" data-i18n="nav_flow">How it works</a>
+          <a href="/#recovery" data-i18n="nav_recovery">Cross-device recovery</a>
+          <a href="/#faq" data-i18n="nav_faq">FAQ</a>
+          <a href="/privacy" aria-current="page" data-i18n="nav_privacy">Privacy</a>
+        </nav>
+
+        <button class="language-toggle" type="button" data-language-toggle aria-label="Switch to Chinese" data-i18n-attr="aria-label:language_toggle">
+          <span class="language-current">EN</span><span class="language-divider">/</span><span data-language-other>中</span>
+        </button>
+
+        <a class="header-cta" href="/#download"><span data-i18n="header_cta">Get started</span><span class="arrow" aria-hidden="true">↗</span></a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu">
+          <span class="sr-only" data-i18n="menu_open">Open menu</span>
+          <span></span><span></span>
+        </button>
+      </div>
+
+      <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile navigation" data-i18n-attr="aria-label:mobile_nav_aria" hidden>
+        <a href="/#security" data-i18n="nav_security">Security model</a>
+        <a href="/#flow" data-i18n="nav_flow">How it works</a>
+        <a href="/#recovery" data-i18n="nav_recovery">Cross-device recovery</a>
+        <a href="/#faq" data-i18n="nav_faq">FAQ</a>
+        <a href="/privacy" aria-current="page" data-i18n="nav_privacy">Privacy</a>
+        <a href="/#download"><span data-i18n="header_cta">Get started</span> <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="privacy-hero section-pad">
+        <div class="container">
+          <a class="privacy-back text-link reveal" href="/"><span aria-hidden="true">←</span><span data-i18n="privacy_back">Back to KeyAuth</span></a>
+          <div class="privacy-heading reveal reveal-delay">
+            <p class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="privacy_eyebrow">PRIVACY / TRANSPARENCY</span></p>
+            <h1 data-i18n-html="privacy_title">Privacy,<br /><em>without the footnotes.</em></h1>
+            <p class="privacy-intro" data-i18n="privacy_intro">This page explains, in plain language, how KeyAuth handles your data: what stays on your device, what syncs as ciphertext, and where website requests go.</p>
+            <p class="privacy-updated" data-i18n="privacy_updated">Last updated: September 22, 2026</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="privacy-content section-pad">
+        <div class="container privacy-layout">
+          <aside class="privacy-summary-card reveal">
+            <span class="privacy-card-index">00 / 06</span>
+            <div class="privacy-card-icon" aria-hidden="true">◎</div>
+            <h2 data-i18n="privacy_summary_title">At a glance</h2>
+            <p data-i18n="privacy_summary">KeyAuth is a local-first TOTP authenticator. Account data is encrypted on your device, while iCloud is used only for optional sync and recovery; KeyAuth has no application server receiving your plaintext codes.</p>
+            <div class="privacy-card-rule"></div>
+            <span class="privacy-card-tag">KEYAUTH / PRIVACY</span>
+          </aside>
+
+          <div class="privacy-sections">
+            <article class="privacy-section reveal reveal-delay-1">
+              <span class="privacy-section-number">01</span>
+              <div><h2 data-i18n="privacy_app_title">Data inside the app</h2><p data-i18n="privacy_app_text">The issuer, account name, TOTP secret, algorithm, digits, period, and custom name you import are encrypted together as an account payload on-device. TOTP generation happens locally, so configured accounts do not require a network.</p></div>
+            </article>
+            <article class="privacy-section reveal reveal-delay-1">
+              <span class="privacy-section-number">02</span>
+              <div><h2 data-i18n="privacy_cloud_title">iCloud syncs ciphertext only</h2><p data-i18n="privacy_cloud_text">When sync is enabled, CloudKit receives necessary metadata such as record UUIDs, encrypted blobs, versions, and timestamps—not directly readable account plaintext. iCloud is a sync and backup layer, not a runtime dependency for generating codes.</p></div>
+            </article>
+            <article class="privacy-section reveal reveal-delay-1">
+              <span class="privacy-section-number">03</span>
+              <div><h2 data-i18n="privacy_key_title">Keys and device authentication</h2><p data-i18n="privacy_key_text">The master key is held in a device Keychain item protected by Face ID, Touch ID, or your passcode and bound to the current device. System authentication must succeed before the vault opens.</p></div>
+            </article>
+            <article class="privacy-section reveal reveal-delay-1">
+              <span class="privacy-section-number">04</span>
+              <div><h2 data-i18n="privacy_recovery_title">Cross-device recovery</h2><p data-i18n="privacy_recovery_text">If you choose to enable recovery, KeyAuth wraps the master-key ring with an independent Recovery Key and stores only the encrypted envelope in CloudKit. The Recovery Key is never uploaded and must be kept by you.</p></div>
+            </article>
+            <article class="privacy-section reveal reveal-delay-1">
+              <span class="privacy-section-number">05</span>
+              <div><h2 data-i18n="privacy_site_title">Website requests</h2><p data-i18n="privacy_site_text">This website is served as Cloudflare Workers Static Assets. It provides no account, form, or app API and does not add third-party advertising or analytics scripts. Cloudflare may still process standard request metadata under its service policies.</p></div>
+            </article>
+            <article class="privacy-section reveal reveal-delay-1">
+              <span class="privacy-section-number">06</span>
+              <div><h2 data-i18n="privacy_choices_title">Your choices</h2><p data-i18n="privacy_choices_text">You can leave iCloud sync and cross-device recovery disabled and use KeyAuth as a local authenticator. Deleting an account removes it locally first and queues the cloud deletion; uninstalling the app does not automatically delete existing CloudKit records.</p></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="privacy-source section-pad">
+        <div class="container privacy-source-panel reveal">
+          <div><p class="eyebrow"><span class="eyebrow-dot"></span> PRIVACY / OPEN SOURCE</p><h2 class="privacy-source-title" data-i18n="privacy_source_title">An implementation you can inspect</h2><p data-i18n="privacy_source_text">The KeyAuth client implementation and this website are public on GitHub. You can inspect the actual encryption, Keychain, CloudKit, and recovery flows.</p><a class="button button-primary" href="https://github.com/kakahu2015/KeyAuth-MVP" target="_blank" rel="noopener noreferrer"><span data-i18n="privacy_source_cta">View the GitHub source</span><span aria-hidden="true">↗</span></a></div>
+          <div class="privacy-source-mark" aria-hidden="true"><span></span><b>OPEN<br />BY<br />DEFAULT</b></div>
+        </div>
+      </section>
+
+      <section class="privacy-note">
+        <div class="container privacy-note-inner"><span class="footer-dot"></span><p data-i18n="privacy_disclaimer">This is a product behavior statement. Before release, the latest Apple, Cloudflare, and App Store terms should still be reviewed by counsel.</p><a class="text-link" href="/"><span data-i18n="privacy_contact">Back to the product</span><span aria-hidden="true">↗</span></a></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="brand" href="/" aria-label="Back to the KeyAuth home page" data-i18n-attr="aria-label:footer_brand_aria"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M16 3.5 26 7v7.6c0 6.2-4.1 11.5-10 13.9C10.1 26.1 6 20.8 6 14.6V7l10-3.5Z" fill="currentColor" opacity=".18"/><path d="M16 3.5 26 7v7.6c0 6.2-4.1 11.5-10 13.9C10.1 26.1 6 20.8 6 14.6V7l10-3.5Z" stroke="currentColor" stroke-width="1.7"/><path d="m12.2 15.7 2.5 2.5 5.1-5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>KeyAuth</span></a>
+        <p data-i18n="footer_tagline">Your codes. Your control.</p>
+        <div class="footer-links"><a href="/" data-i18n="privacy_contact">Product</a><a href="/privacy" data-i18n="footer_privacy">Privacy</a><a href="https://github.com/kakahu2015/KeyAuth-MVP" target="_blank" rel="noopener noreferrer" data-i18n="footer_source">Source</a></div>
+      </div>
+    </footer>
+  </body>
+</html>

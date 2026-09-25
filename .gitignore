@@ -11,3 +11,7 @@ Packages/
 
 # Local development artifacts
 *.log
+
+# Cloudflare Workers website
+website/node_modules/
+website/.wrangler/
