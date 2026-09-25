@@ -23,6 +23,31 @@ struct CryptoManager {
         )
     }
 
+    static func associatedData(
+        for id: UUID,
+        version: Int,
+        keyVersion: Int,
+        createdAt: Date,
+        updatedAt: Date
+    ) -> Data {
+        var data = associatedData(
+            for: id,
+            version: version,
+            keyVersion: keyVersion
+        )
+        // Append fixed-width IEEE-754 date bits in network byte order. This
+        // keeps the v4 AAD encoding deterministic across devices.
+        var createdAtBits = createdAt.timeIntervalSinceReferenceDate.bitPattern.bigEndian
+        var updatedAtBits = updatedAt.timeIntervalSinceReferenceDate.bitPattern.bigEndian
+        withUnsafeBytes(of: &createdAtBits) {
+            data.append(contentsOf: $0)
+        }
+        withUnsafeBytes(of: &updatedAtBits) {
+            data.append(contentsOf: $0)
+        }
+        return data
+    }
+
     static func legacyAssociatedData(for id: UUID, version: Int) -> Data {
         Data("KeyAuth/EncryptedOTP/v\(version)/\(id.uuidString)".utf8)
     }

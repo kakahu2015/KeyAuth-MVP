@@ -70,13 +70,21 @@ struct OTPAccountPayload: Codable, Sendable, Hashable {
     }
 }
 
+struct EncryptedOTPRecordPayload: Codable, Sendable {
+    let otp: OTPAccountPayload
+    let createdAt: Date
+    let updatedAt: Date
+}
+
 struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
-    static let currentVersion = 3
+    static let currentVersion = 4
 
     let id: UUID
     var encryptedBlob: Data
     var version: Int
     var keyVersion: Int
+    // Plaintext copies are CloudKit query/sort hints. Version 4 authenticates
+    // the canonical timestamps inside encryptedBlob.
     var createdAt: Date
     var updatedAt: Date
 

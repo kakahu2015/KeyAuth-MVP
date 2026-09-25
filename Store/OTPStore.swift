@@ -201,12 +201,12 @@ final class OTPStore: ObservableObject {
         decoded.reserveCapacity(encrypted.count)
 
         for item in encrypted where !deletedIDs.contains(item.id.uuidString) {
-            let payload = try decryptPayload(for: item)
+            let record = try decryptRecord(for: item)
             decoded.append(DecryptedAccount(
                 id: item.id,
-                payload: payload,
-                createdAt: item.createdAt,
-                updatedAt: item.updatedAt
+                payload: record.otp,
+                createdAt: record.createdAt,
+                updatedAt: record.updatedAt
             ))
         }
 
@@ -217,16 +217,30 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    private func decryptPayload(
+    private func decryptRecord(
         for item: EncryptedOTPAccount
-    ) throws -> OTPAccountPayload {
+    ) throws -> EncryptedOTPRecordPayload {
         guard let key = masterKeys[item.keyVersion] else {
             throw OTPStoreError.masterKeyUnavailable
         }
 
         do {
-            if item.version >= 3 {
+            switch item.version {
+            case 4:
                 return try CryptoManager.decrypt(
+                    EncryptedOTPRecordPayload.self,
+                    from: item.encryptedBlob,
+                    using: key,
+                    associatedData: CryptoManager.associatedData(
+                        for: item.id,
+                        version: item.version,
+                        keyVersion: item.keyVersion,
+                        createdAt: item.createdAt,
+                        updatedAt: item.updatedAt
+                    )
+                )
+            case 3:
+                let payload = try CryptoManager.decrypt(
                     OTPAccountPayload.self,
                     from: item.encryptedBlob,
                     using: key,
@@ -236,29 +250,86 @@ final class OTPStore: ObservableObject {
                         keyVersion: item.keyVersion
                     )
                 )
-
-            }
-
-            return try CryptoManager.decrypt(
-                OTPAccountPayload.self,
-                from: item.encryptedBlob,
-                using: key,
-                associatedData: CryptoManager.legacyAssociatedData(
-                    for: item.id,
-                    version: item.version
+                return EncryptedOTPRecordPayload(
+                    otp: payload,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt
                 )
-            )
-        } catch {
-            if item.version == 1 {
-                return try CryptoManager.decryptLegacy(
+            case 2:
+                let payload = try CryptoManager.decrypt(
                     OTPAccountPayload.self,
                     from: item.encryptedBlob,
-                    using: key
+                    using: key,
+                    associatedData: CryptoManager.legacyAssociatedData(
+                        for: item.id,
+                        version: item.version
+                    )
                 )
+                return EncryptedOTPRecordPayload(
+                    otp: payload,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt
+                )
+            case 1:
+                let payload: OTPAccountPayload
+                do {
+                    payload = try CryptoManager.decrypt(
+                        OTPAccountPayload.self,
+                        from: item.encryptedBlob,
+                        using: key,
+                        associatedData: CryptoManager.legacyAssociatedData(
+                            for: item.id,
+                            version: item.version
+                        )
+                    )
+                } catch {
+                    payload = try CryptoManager.decryptLegacy(
+                        OTPAccountPayload.self,
+                        from: item.encryptedBlob,
+                        using: key
+                    )
+                }
+                return EncryptedOTPRecordPayload(
+                    otp: payload,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt
+                )
+            default:
+                throw OTPStoreError.undecryptableRecord
             }
-
+        } catch let error as OTPStoreError {
+            throw error
+        } catch {
             throw OTPStoreError.undecryptableRecord
         }
+    }
+
+    private func encryptRecord(
+        _ record: EncryptedOTPRecordPayload,
+        for id: UUID,
+        using key: SymmetricKey,
+        keyVersion: Int
+    ) throws -> EncryptedOTPAccount {
+        let version = EncryptedOTPAccount.currentVersion
+        let encryptedBlob = try CryptoManager.encrypt(
+            record,
+            using: key,
+            associatedData: CryptoManager.associatedData(
+                for: id,
+                version: version,
+                keyVersion: keyVersion,
+                createdAt: record.createdAt,
+                updatedAt: record.updatedAt
+            )
+        )
+        return EncryptedOTPAccount(
+            id: id,
+            encryptedBlob: encryptedBlob,
+            version: version,
+            keyVersion: keyVersion,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt
+        )
     }
 
     private func removeExactDuplicates(
@@ -276,8 +347,8 @@ final class OTPStore: ObservableObject {
         }
 
         for item in ordered {
-            let payload = try decryptPayload(for: item)
-            guard seenAccounts.insert(payload.identity).inserted else {
+            let record = try decryptRecord(for: item)
+            guard seenAccounts.insert(record.otp.identity).inserted else {
                 // Keep the oldest copy and remove later records for the same
                 // OTP credential, even if their display names differ.
                 try await deleteEncryptedAccount(id: item.id)
@@ -317,26 +388,21 @@ final class OTPStore: ObservableObject {
 
             let id = UUID()
             let keyVersion = currentKeyVersion
-            let version = EncryptedOTPAccount.currentVersion
-            let encryptedBlob = try CryptoManager.encrypt(
-                payload,
-                using: masterKey,
-                associatedData: CryptoManager.associatedData(
-                    for: id,
-                    version: version,
-                    keyVersion: keyVersion
-                )
+            let now = Date()
+            let protectedPayload = EncryptedOTPRecordPayload(
+                otp: payload,
+                createdAt: now,
+                updatedAt: now
             )
-
-            let item = EncryptedOTPAccount(
-                id: id,
-                encryptedBlob: encryptedBlob,
-                version: version,
+            let item = try encryptRecord(
+                protectedPayload,
+                for: id,
+                using: masterKey,
                 keyVersion: keyVersion
             )
 
             try await saveEncryptedAccount(item)
-            publishSavedAccount(item, payload: payload)
+            publishSavedAccount(item, record: protectedPayload)
             startPendingUploads()
             return true
         } catch {
@@ -369,27 +435,20 @@ final class OTPStore: ObservableObject {
                 displayName: displayName.isEmpty ? nil : displayName
             )
             let keyVersion = currentKeyVersion
-            let version = EncryptedOTPAccount.currentVersion
-            let encryptedBlob = try CryptoManager.encrypt(
-                payload,
-                using: masterKey,
-                associatedData: CryptoManager.associatedData(
-                    for: id,
-                    version: version,
-                    keyVersion: keyVersion
-                )
-            )
-            let item = EncryptedOTPAccount(
-                id: id,
-                encryptedBlob: encryptedBlob,
-                version: version,
-                keyVersion: keyVersion,
+            let protectedPayload = EncryptedOTPRecordPayload(
+                otp: payload,
                 createdAt: account.createdAt,
                 updatedAt: .now
             )
+            let item = try encryptRecord(
+                protectedPayload,
+                for: id,
+                using: masterKey,
+                keyVersion: keyVersion
+            )
 
             try await updateEncryptedAccount(item)
-            publishSavedAccount(item, payload: payload)
+            publishSavedAccount(item, record: protectedPayload)
             startPendingUploads()
             return true
         } catch {
@@ -501,26 +560,14 @@ final class OTPStore: ObservableObject {
             rotated.reserveCapacity(encrypted.count)
 
             for item in encrypted {
-                let payload = try decryptPayload(for: item)
-                let recordVersion = EncryptedOTPAccount.currentVersion
-                let blob = try CryptoManager.encrypt(
-                    payload,
+                let record = try decryptRecord(for: item)
+                let rotatedItem = try encryptRecord(
+                    record,
+                    for: item.id,
                     using: newKey,
-                    associatedData: CryptoManager.associatedData(
-                        for: item.id,
-                        version: recordVersion,
-                        keyVersion: newVersion
-                    )
+                    keyVersion: newVersion
                 )
-
-                rotated.append(EncryptedOTPAccount(
-                    id: item.id,
-                    encryptedBlob: blob,
-                    version: recordVersion,
-                    keyVersion: newVersion,
-                    createdAt: item.createdAt,
-                    updatedAt: .now
-                ))
+                rotated.append(rotatedItem)
             }
 
             // Replace the local vault before making the new version current.
@@ -552,11 +599,39 @@ final class OTPStore: ObservableObject {
     private func installLocalAccounts(
         _ encrypted: [EncryptedOTPAccount]
     ) async throws {
+        guard let currentKey = masterKey else {
+            throw OTPStoreError.masterKeyUnavailable
+        }
+
         let visible = encrypted.filter {
             !deletedIDs.contains($0.id.uuidString)
         }
-        try await LocalEncryptedStore.shared.replaceAll(visible)
-        try await replaceAccounts(with: visible)
+        var current: [EncryptedOTPAccount] = []
+        current.reserveCapacity(visible.count)
+
+        for item in visible {
+            let record = try decryptRecord(for: item)
+            guard item.version != EncryptedOTPAccount.currentVersion ||
+                    item.keyVersion != currentKeyVersion
+            else {
+                current.append(item)
+                continue
+            }
+
+            let migrated = try encryptRecord(
+                record,
+                for: item.id,
+                using: currentKey,
+                keyVersion: currentKeyVersion
+            )
+            current.append(migrated)
+            if isCloudSyncEnabled {
+                try await queueUpload(migrated)
+            }
+        }
+
+        try await LocalEncryptedStore.shared.replaceAll(current)
+        try await replaceAccounts(with: current)
     }
 
     private func queueUpload(_ item: EncryptedOTPAccount) async throws {
@@ -643,27 +718,15 @@ final class OTPStore: ObservableObject {
 
         let pending = try await PendingCloudUploads.shared.fetch(owner: owner)
 
-        for item in pending where item.keyVersion != currentKeyVersion {
-            let payload = try decryptPayload(for: item)
-            let recordVersion = EncryptedOTPAccount.currentVersion
-            let blob = try CryptoManager.encrypt(
-                payload,
+        for item in pending where
+            item.version != EncryptedOTPAccount.currentVersion ||
+                item.keyVersion != currentKeyVersion {
+            let record = try decryptRecord(for: item)
+            let migrated = try encryptRecord(
+                record,
+                for: item.id,
                 using: currentKey,
-                associatedData: CryptoManager.associatedData(
-                    for: item.id,
-                    version: recordVersion,
-                    keyVersion: currentKeyVersion
-                )
-            )
-
-            let migrated = EncryptedOTPAccount(
-                id: item.id,
-                encryptedBlob: blob,
-                version: recordVersion,
-                keyVersion: currentKeyVersion,
-                createdAt: item.createdAt,
-                // This is a re-encryption, not a user edit.
-                updatedAt: item.updatedAt
+                keyVersion: currentKeyVersion
             )
 
             try await PendingCloudUploads.shared.save(
@@ -885,15 +948,15 @@ final class OTPStore: ObservableObject {
 
     private func publishSavedAccount(
         _ item: EncryptedOTPAccount,
-        payload: OTPAccountPayload
+        record: EncryptedOTPRecordPayload
     ) {
         // A successful write is authoritative; query indexing may lag behind it.
         accounts.removeAll { $0.id == item.id }
         accounts.append(DecryptedAccount(
             id: item.id,
-            payload: payload,
-            createdAt: item.createdAt,
-            updatedAt: item.updatedAt
+            payload: record.otp,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt
         ))
         accounts.sort {
             $0.payload.displayTitle.localizedCaseInsensitiveCompare(

@@ -23,13 +23,22 @@ enum SecureEnclaveWrapper {
     private static let privateKeyTag = Data(
         "org.kakahu.KeyAuth.SecureEnclaveWrapper.v1.private".utf8
     )
-    private static let publicKeyTag = Data(
-        "org.kakahu.KeyAuth.SecureEnclaveWrapper.v1.public".utf8
-    )
 
     static func wrap(_ plaintext: Data) throws -> Data {
-        let publicKey = try publicKey()
-        guard SecKeyIsAlgorithmSupported(publicKey, .encrypt, algorithm) else {
+        let privateKey = try privateKey(
+            context: nil,
+            createIfMissing: true
+        )
+
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            throw SecureEnclaveWrapperError.keyUnavailable
+        }
+
+        guard SecKeyIsAlgorithmSupported(
+            publicKey,
+            .encrypt,
+            algorithm
+        ) else {
             throw SecureEnclaveWrapperError.algorithmUnavailable
         }
 
@@ -70,23 +79,6 @@ enum SecureEnclaveWrapper {
         return plaintext
     }
 
-    private static func publicKey() throws -> SecKey {
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(
-            publicKeyQuery() as CFDictionary,
-            &item
-        )
-        if status == errSecSuccess, let item {
-            return item as! SecKey
-        }
-        guard status == errSecItemNotFound else {
-            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
-        }
-
-        let pair = try createKeyPair()
-        return pair.publicKey
-    }
-
     private static func privateKey(
         context: LAContext?,
         createIfMissing: Bool
@@ -108,10 +100,10 @@ enum SecureEnclaveWrapper {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
         }
 
-        return try createKeyPair().privateKey
+        return try createPrivateKey()
     }
 
-    private static func createKeyPair() throws -> (privateKey: SecKey, publicKey: SecKey) {
+    private static func createPrivateKey() throws -> SecKey {
         var accessError: Unmanaged<CFError>?
         guard let access = SecAccessControlCreateWithFlags(
             nil,
@@ -133,10 +125,6 @@ enum SecureEnclaveWrapper {
                 kSecAttrIsPermanent as String: true,
                 kSecAttrApplicationTag as String: privateKeyTag,
                 kSecAttrAccessControl as String: access
-            ],
-            kSecPublicKeyAttrs as String: [
-                kSecAttrIsPermanent as String: true,
-                kSecAttrApplicationTag as String: publicKeyTag
             ]
         ]
 
@@ -150,10 +138,7 @@ enum SecureEnclaveWrapper {
             }
             throw SecureEnclaveWrapperError.keyUnavailable
         }
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw SecureEnclaveWrapperError.keyUnavailable
-        }
-        return (privateKey, publicKey)
+        return privateKey
     }
 
     private static func privateKeyQuery() -> [String: Any] {
@@ -163,17 +148,6 @@ enum SecureEnclaveWrapper {
             kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
             kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecAttrApplicationTag as String: privateKeyTag,
-            kSecReturnRef as String: true,
-            kSecUseDataProtectionKeychain as String: true
-        ]
-    }
-
-    private static func publicKeyQuery() -> [String: Any] {
-        [
-            kSecClass as String: kSecClassKey,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-            kSecAttrApplicationTag as String: publicKeyTag,
             kSecReturnRef as String: true,
             kSecUseDataProtectionKeychain as String: true
         ]
