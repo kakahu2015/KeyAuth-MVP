@@ -234,9 +234,7 @@ final class OTPStore: ObservableObject {
                     associatedData: CryptoManager.associatedData(
                         for: item.id,
                         version: item.version,
-                        keyVersion: item.keyVersion,
-                        createdAt: item.createdAt,
-                        updatedAt: item.updatedAt
+                        keyVersion: item.keyVersion
                     )
                 )
             case 3:
@@ -317,9 +315,7 @@ final class OTPStore: ObservableObject {
             associatedData: CryptoManager.associatedData(
                 for: id,
                 version: version,
-                keyVersion: keyVersion,
-                createdAt: record.createdAt,
-                updatedAt: record.updatedAt
+                keyVersion: keyVersion
             )
         )
         return EncryptedOTPAccount(
@@ -335,19 +331,29 @@ final class OTPStore: ObservableObject {
     private func removeExactDuplicates(
         from encrypted: [EncryptedOTPAccount]
     ) async throws -> [EncryptedOTPAccount] {
-        var seenAccounts = Set<OTPAccountIdentity>()
-        var unique: [EncryptedOTPAccount] = []
-        unique.reserveCapacity(encrypted.count)
+        var decoded: [(item: EncryptedOTPAccount, record: EncryptedOTPRecordPayload)] = []
+        decoded.reserveCapacity(encrypted.count)
 
-        let ordered = encrypted.sorted {
-            if $0.createdAt != $1.createdAt {
-                return $0.createdAt < $1.createdAt
-            }
-            return $0.id.uuidString < $1.id.uuidString
+        for item in encrypted {
+            let record = try decryptRecord(for: item)
+            decoded.append((item, record))
         }
 
-        for item in ordered {
-            let record = try decryptRecord(for: item)
+        decoded.sort {
+            if $0.record.createdAt != $1.record.createdAt {
+                return $0.record.createdAt < $1.record.createdAt
+            }
+
+            return $0.item.id.uuidString < $1.item.id.uuidString
+        }
+
+        var seenAccounts = Set<OTPAccountIdentity>()
+        var unique: [EncryptedOTPAccount] = []
+        unique.reserveCapacity(decoded.count)
+
+        for entry in decoded {
+            let item = entry.item
+            let record = entry.record
             guard seenAccounts.insert(record.otp.identity).inserted else {
                 // Keep the oldest copy and remove later records for the same
                 // OTP credential, even if their display names differ.
