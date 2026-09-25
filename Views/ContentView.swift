@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject private var store: OTPStore
     @EnvironmentObject private var appLock: AppLockManager
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isSceneCaptured) private var isSceneCaptured
 
     @State private var showAdd = false
     @State private var showRecovery = false
@@ -22,6 +23,17 @@ struct ContentView: View {
             if newPhase == .background {
                 appLock.lock()
                 store.lock()
+            }
+        }
+        .onChange(of: isSceneCaptured) { _, captured in
+            if captured {
+                appLock.lock()
+                store.lock()
+            }
+        }
+        .overlay {
+            if scenePhase != .active || isSceneCaptured {
+                SensitiveContentShield(isCaptured: isSceneCaptured)
             }
         }
         .onChange(of: appLock.isLocked) { _, isLocked in

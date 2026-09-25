@@ -8,6 +8,7 @@ enum KeychainError: LocalizedError {
     case malformedKeyData
     case accessControlUnavailable
     case masterKeyUnavailable
+    case malformedRecoveryEpoch
 
     var errorDescription: String? {
         switch self {
@@ -21,6 +22,8 @@ enum KeychainError: LocalizedError {
             )
         case .masterKeyUnavailable:
             return String(localized: "The KeyAuth master key could not be unlocked.")
+        case .malformedRecoveryEpoch:
+            return String(localized: "The saved recovery version is invalid.")
         }
     }
 }
@@ -36,6 +39,8 @@ actor KeychainManager {
     private let pendingRotationKey = "KeyAuth.MasterKey.PendingRotation"
     private let recoveryService = "KeyAuth.RecoveryKey.v1"
     private let simulatorRecoveryKey = "KeyAuth.SimulatorRecoveryKey.v1"
+    private let highestAcceptedRecoveryEpochService =
+        "KeyAuth.Recovery.HighestAcceptedEpoch"
 
     func currentMasterKeyVersion() -> Int {
         let value = UserDefaults.standard.integer(forKey: currentKeyVersionKey)
@@ -53,6 +58,125 @@ actor KeychainManager {
     func pendingRotationVersion() -> Int? {
         let value = UserDefaults.standard.integer(forKey: pendingRotationKey)
         return value == 0 ? nil : value
+    }
+
+    func highestAcceptedRecoveryEpoch() throws -> UInt64 {
+#if targetEnvironment(simulator)
+        guard let value = UserDefaults.standard.string(
+            forKey: highestAcceptedRecoveryEpochService
+        ) else {
+            return 0
+        }
+        guard let epoch = UInt64(value) else {
+            throw KeychainError.malformedRecoveryEpoch
+        }
+        return epoch
+#else
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: highestAcceptedRecoveryEpochService,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound {
+            return 0
+        }
+        guard status == errSecSuccess, let data = item as? Data,
+              let value = String(data: data, encoding: .utf8),
+              let epoch = UInt64(value)
+        else {
+            if status != errSecSuccess {
+                throw KeychainError.unexpectedStatus(status)
+            }
+            throw KeychainError.malformedRecoveryEpoch
+        }
+        return epoch
+#endif
+    }
+
+    func hasAcceptedRecoveryEpoch() throws -> Bool {
+#if targetEnvironment(simulator)
+        return UserDefaults.standard.object(
+            forKey: highestAcceptedRecoveryEpochService
+        ) != nil
+#else
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: highestAcceptedRecoveryEpochService,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound {
+            return false
+        }
+        guard status == errSecSuccess else {
+            throw KeychainError.unexpectedStatus(status)
+        }
+        return true
+#endif
+    }
+
+    func recordAcceptedRecoveryEpoch(_ epoch: UInt64) throws {
+        let highestEpoch = try highestAcceptedRecoveryEpoch()
+        let hasStoredEpoch = try hasAcceptedRecoveryEpoch()
+        guard epoch >= highestEpoch,
+              epoch != highestEpoch || !hasStoredEpoch
+        else {
+            return
+        }
+
+#if targetEnvironment(simulator)
+        UserDefaults.standard.set(
+            String(epoch),
+            forKey: highestAcceptedRecoveryEpochService
+        )
+#else
+        let data = Data(String(epoch).utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: highestAcceptedRecoveryEpochService,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        let updates: [String: Any] = [kSecValueData as String: data]
+        let updateStatus = SecItemUpdate(
+            query as CFDictionary,
+            updates as CFDictionary
+        )
+        if updateStatus == errSecSuccess {
+            return
+        }
+        guard updateStatus == errSecItemNotFound else {
+            throw KeychainError.unexpectedStatus(updateStatus)
+        }
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] =
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            if addStatus == errSecDuplicateItem {
+                let retryStatus = SecItemUpdate(
+                    query as CFDictionary,
+                    updates as CFDictionary
+                )
+                guard retryStatus == errSecSuccess else {
+                    throw KeychainError.unexpectedStatus(retryStatus)
+                }
+                return
+            }
+            throw KeychainError.unexpectedStatus(addStatus)
+        }
+#endif
     }
 
     private func service(for version: Int) -> String {
@@ -91,7 +215,28 @@ actor KeychainManager {
             version: version,
             context: context
         ) {
-            return try makeKey(from: protectedData)
+            if protectedData.count == 32 {
+                let wrappedData = try SecureEnclaveWrapper.wrap(protectedData)
+                let verifiedData = try SecureEnclaveWrapper.unwrap(
+                    wrappedData,
+                    context: context
+                )
+                guard verifiedData == protectedData else {
+                    throw KeychainError.malformedKeyData
+                }
+                try updateProtectedMasterKeyData(
+                    wrappedData,
+                    service: service(for: version),
+                    context: context
+                )
+                return try makeKey(from: verifiedData)
+            }
+
+            let unwrappedData = try SecureEnclaveWrapper.unwrap(
+                protectedData,
+                context: context
+            )
+            return try makeKey(from: unwrappedData)
         }
 
         // Migrate the previous synchronizable key only through this
@@ -103,15 +248,33 @@ actor KeychainManager {
         guard let legacyData = try readLegacyMasterKeyData() else {
             return nil
         }
+        guard legacyData.count == 32 else {
+            throw KeychainError.malformedKeyData
+        }
+        let wrappedLegacyData = try SecureEnclaveWrapper.wrap(legacyData)
+        let verifiedLegacyData = try SecureEnclaveWrapper.unwrap(
+            wrappedLegacyData,
+            context: context
+        )
+        guard verifiedLegacyData == legacyData else {
+            throw KeychainError.malformedKeyData
+        }
         _ = try storeProtectedMasterKeyData(
-            legacyData,
+            wrappedLegacyData,
             service: service(for: version)
         )
-        guard let migratedData = try readProtectedMasterKeyData(
+        guard let migratedWrappedData = try readProtectedMasterKeyData(
             version: version,
             context: context
         ) else {
             throw KeychainError.masterKeyUnavailable
+        }
+        let migratedData = try SecureEnclaveWrapper.unwrap(
+            migratedWrappedData,
+            context: context
+        )
+        guard migratedData == legacyData else {
+            throw KeychainError.malformedKeyData
         }
         try deleteLegacyMasterKey()
         return try makeKey(from: migratedData)
@@ -135,8 +298,9 @@ actor KeychainManager {
             forKey: simulatorStorageKey(for: 1)
         )
 #else
+        let wrappedData = try SecureEnclaveWrapper.wrap(data)
         _ = try storeProtectedMasterKeyData(
-            data,
+            wrappedData,
             service: service(for: 1)
         )
 #endif
@@ -154,8 +318,9 @@ actor KeychainManager {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
 #else
+        let wrappedData = try SecureEnclaveWrapper.wrap(data)
         _ = try storeProtectedMasterKeyData(
-            data,
+            wrappedData,
             service: service(for: newVersion)
         )
 #endif
@@ -309,8 +474,9 @@ actor KeychainManager {
                 forKey: simulatorStorageKey(for: version)
             )
 #else
+            let wrappedData = try SecureEnclaveWrapper.wrap(data)
             try replaceProtectedMasterKeyData(
-                data,
+                wrappedData,
                 service: service(for: version)
             )
 #endif
@@ -414,7 +580,7 @@ actor KeychainManager {
         _ data: Data,
         service: String
     ) throws -> Data {
-        guard data.count == 32 else {
+        guard !data.isEmpty else {
             throw KeychainError.malformedKeyData
         }
 
@@ -439,7 +605,7 @@ actor KeychainManager {
         _ data: Data,
         service: String
     ) throws {
-        guard data.count == 32 else {
+        guard !data.isEmpty else {
             throw KeychainError.malformedKeyData
         }
 
@@ -464,6 +630,28 @@ actor KeychainManager {
             data,
             service: service
         )
+    }
+
+    private func updateProtectedMasterKeyData(
+        _ data: Data,
+        service: String,
+        context: LAContext
+    ) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true,
+            kSecUseAuthenticationContext as String: context
+        ]
+        let updates: [String: Any] = [kSecValueData as String: data]
+        let status = SecItemUpdate(
+            query as CFDictionary,
+            updates as CFDictionary
+        )
+        guard status == errSecSuccess else {
+            throw KeychainError.unexpectedStatus(status)
+        }
     }
 
     private func deleteLegacyMasterKey() throws {

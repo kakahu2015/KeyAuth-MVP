@@ -6,6 +6,7 @@ enum CloudKitManagerError: LocalizedError {
     case recordTypeMissing(String)
     case recordFetchFailed
     case malformedRecord(String)
+    case recoveryEnvelopeChanged
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,8 @@ enum CloudKitManagerError: LocalizedError {
             return String(localized: "CloudKit returned a record that could not be read.")
         case .malformedRecord(let recordName):
             return String(localized: "CloudKit returned a malformed record.") + " (\(recordName))"
+        case .recoveryEnvelopeChanged:
+            return String(localized: "Recovery data changed on another device. Please try again.")
         }
     }
 }
@@ -104,14 +107,25 @@ actor CloudKitManager {
     }
 
     func saveRecoveryEnvelope(
-        _ envelope: RecoveryEnvelope
+        _ envelope: RecoveryEnvelope,
+        expectedEncryptedBlob: Data?
     ) async throws {
         let database = try configuredDatabase()
         let record: CKRecord
 
         do {
-            record = try await database.record(for: recoveryRecordID)
+            let existingRecord = try await database.record(for: recoveryRecordID)
+            guard let expectedEncryptedBlob,
+                  let serverBlob = existingRecord["blob"] as? Data,
+                  serverBlob == expectedEncryptedBlob
+            else {
+                throw CloudKitManagerError.recoveryEnvelopeChanged
+            }
+            record = existingRecord
         } catch let error as CKError where error.code == .unknownItem {
+            guard expectedEncryptedBlob == nil else {
+                throw CloudKitManagerError.recoveryEnvelopeChanged
+            }
             record = CKRecord(
                 recordType: recoveryRecordType,
                 recordID: recoveryRecordID

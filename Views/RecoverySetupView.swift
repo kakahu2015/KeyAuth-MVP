@@ -3,6 +3,8 @@ import SwiftUI
 struct RecoverySetupView: View {
     @EnvironmentObject private var store: OTPStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isSceneCaptured) private var isSceneCaptured
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var recoveryCode: String?
     @State private var isWorking = false
@@ -19,9 +21,16 @@ struct RecoverySetupView: View {
                     )
                         .foregroundStyle(.secondary)
 
-                    Text(recoveryCode)
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
+                    Group {
+                        if isSceneCaptured || scenePhase != .active {
+                            Label("Recovery key hidden", systemImage: "eye.slash.fill")
+                        } else {
+                            Text(recoveryCode)
+                                .font(.system(.body, design: .monospaced))
+                                .textSelection(.enabled)
+                                .privacySensitive()
+                        }
+                    }
                         .padding()
                         .background(.secondary.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 12))

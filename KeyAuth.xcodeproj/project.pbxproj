@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		0A5CB94FD0A670914A7E3654 /* AddAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3E082D14A2C0B503A2A3B2D /* AddAccountView.swift */; };
+		14A5D66BC41B5F2A11D39001 /* SensitiveContentShield.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14A5D66BC41B5F2A11D39003 /* SensitiveContentShield.swift */; };
+		14A5D66BC41B5F2A11D39002 /* SecureEnclaveWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14A5D66BC41B5F2A11D39004 /* SecureEnclaveWrapper.swift */; };
 		2115C65D20B4ADAFCAEC2BDF /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B604D153E20D96124B7BAFFC /* InfoPlist.strings */; };
 		2A1D8F5669C3DD5F90C6E444 /* LocalEncryptedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3B3CBAE1D3FAE61D02733D /* LocalEncryptedStore.swift */; };
 		2FAAD21F0FE43DF44CC81C47 /* CloudKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E390A3700FAEAB320AF139 /* CloudKitManager.swift */; };
@@ -33,6 +35,8 @@
 /* Begin PBXFileReference section */
 		02A66AB2D8FD8EAE643AEE81 /* Base32.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Base32.swift; sourceTree = "<group>"; };
 		0A35624D5DB5BFA8090C1888 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		14A5D66BC41B5F2A11D39003 /* SensitiveContentShield.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensitiveContentShield.swift; sourceTree = "<group>"; };
+		14A5D66BC41B5F2A11D39004 /* SecureEnclaveWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureEnclaveWrapper.swift; sourceTree = "<group>"; };
 		17CAEF229939287730925532 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		18C0EFEAAF5E1C23957D7042 /* RecoverySetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverySetupView.swift; sourceTree = "<group>"; };
 		19E390A3700FAEAB320AF139 /* CloudKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitManager.swift; sourceTree = "<group>"; };
@@ -117,6 +121,7 @@
 				73D0DE52196F5534ACF8266A /* CryptoManager.swift */,
 				71DE2F9C83832F434BA9372B /* KeychainManager.swift */,
 				E1E99DD5E0C6595C4D495905 /* RecoveryManager.swift */,
+				14A5D66BC41B5F2A11D39004 /* SecureEnclaveWrapper.swift */,
 			);
 			path = Security;
 			sourceTree = "<group>";
@@ -129,6 +134,7 @@
 				56D8BA819C66E148B4E25860 /* EditAccountView.swift */,
 				7FC7E63B8585086D0164181D /* QRScannerView.swift */,
 				18C0EFEAAF5E1C23957D7042 /* RecoverySetupView.swift */,
+				14A5D66BC41B5F2A11D39003 /* SensitiveContentShield.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -264,6 +270,7 @@
 				7D4953F130577DCCFD4863A3 /* Base32.swift in Sources */,
 				2FAAD21F0FE43DF44CC81C47 /* CloudKitManager.swift in Sources */,
 				B2208AEF693EA92AB887901A /* ContentView.swift in Sources */,
+				14A5D66BC41B5F2A11D39002 /* SecureEnclaveWrapper.swift in Sources */,
 				629E461AA7DACA0011D7AE5E /* CryptoManager.swift in Sources */,
 				B0539402AD6AF1F980932199 /* EditAccountView.swift in Sources */,
 				F4629FBDD2BD76E9966A8474 /* KeyAuthApp.swift in Sources */,
@@ -276,6 +283,7 @@
 				3E8564E2E3088606F83F7395 /* RecoveryEnvelope.swift in Sources */,
 				A36AF16349982F9AAF5E8757 /* RecoveryManager.swift in Sources */,
 				EF28774918FE5290D74935F2 /* RecoverySetupView.swift in Sources */,
+				14A5D66BC41B5F2A11D39001 /* SensitiveContentShield.swift in Sources */,
 				DEA2C17CB50E4505A5140C9E /* TOTPManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

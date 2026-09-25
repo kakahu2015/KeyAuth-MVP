@@ -3,13 +3,31 @@ import Foundation
 actor LocalEncryptedStore {
     static let shared = LocalEncryptedStore()
 
-    private let storageKey = "KeyAuth.LocalEncryptedAccounts.v1"
+    private let legacyStorageKey = "KeyAuth.LocalEncryptedAccounts.v1"
 
     func fetchAll() throws -> [EncryptedOTPAccount] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+        let url = try storageURL()
+        if FileManager.default.fileExists(atPath: url.path) {
+            let data = try Data(contentsOf: url)
+            let items = try JSONDecoder().decode(
+                [EncryptedOTPAccount].self,
+                from: data
+            )
+            UserDefaults.standard.removeObject(forKey: legacyStorageKey)
+            return items
+        }
+
+        guard let legacyData = UserDefaults.standard.data(forKey: legacyStorageKey) else {
             return []
         }
-        return try JSONDecoder().decode([EncryptedOTPAccount].self, from: data)
+
+        let items = try JSONDecoder().decode(
+            [EncryptedOTPAccount].self,
+            from: legacyData
+        )
+        try persist(items, to: url)
+        UserDefaults.standard.removeObject(forKey: legacyStorageKey)
+        return items
     }
 
     func save(_ item: EncryptedOTPAccount) throws {
@@ -32,8 +50,33 @@ actor LocalEncryptedStore {
     }
 
     private func persist(_ items: [EncryptedOTPAccount]) throws {
+        try persist(items, to: storageURL())
+    }
+
+    private func storageURL() throws -> URL {
+        let applicationSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let directory = applicationSupport.appendingPathComponent(
+            "KeyAuthVault",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        return directory.appendingPathComponent("EncryptedAccounts.v1.json")
+    }
+
+    private func persist(_ items: [EncryptedOTPAccount], to url: URL) throws {
         let data = try JSONEncoder().encode(items)
-        UserDefaults.standard.set(data, forKey: storageKey)
+        try data.write(
+            to: url,
+            options: [.atomic, .completeFileProtection]
+        )
     }
 }
 

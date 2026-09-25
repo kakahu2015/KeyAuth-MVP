@@ -9,6 +9,8 @@ enum RecoveryError: LocalizedError {
     case malformedEnvelope
     case recoveryKeyUnavailable
     case alreadyEnabled
+    case rollbackDetected
+    case epochOverflow
 
     var errorDescription: String? {
         switch self {
@@ -24,13 +26,19 @@ enum RecoveryError: LocalizedError {
             return String(
                 localized: "iCloud recovery is already enabled. A new recovery key cannot be generated."
             )
+        case .rollbackDetected:
+            return String(localized: "Recovery data rollback detected.")
+        case .epochOverflow:
+            return String(localized: "The recovery data version limit was reached.")
         }
     }
 }
 
 struct RecoveryKeyringSnapshot: Sendable {
+    let epoch: UInt64
     let currentVersion: Int
     let keyData: [Int: Data]
+    let encryptedBlob: Data
 }
 
 struct RecoverySetupResult: Sendable {
@@ -79,7 +87,31 @@ actor RecoveryManager {
             throw RecoveryError.malformedEnvelope
         }
 
+        let hasAcceptedEnvelope = try await KeychainManager.shared
+            .hasAcceptedRecoveryEpoch()
+        let previousEpoch: UInt64
+        let expectedEncryptedBlob: Data?
+        do {
+            let snapshot = try await fetchKeyring(
+                recoveryKey: recoveryKey
+            )
+            previousEpoch = snapshot.epoch
+            expectedEncryptedBlob = snapshot.encryptedBlob
+        } catch RecoveryError.envelopeMissing {
+            guard !hasAcceptedEnvelope else {
+                throw RecoveryError.rollbackDetected
+            }
+            previousEpoch = 0
+            expectedEncryptedBlob = nil
+        }
+
+        let (epoch, overflow) = previousEpoch.addingReportingOverflow(1)
+        guard !overflow else {
+            throw RecoveryError.epochOverflow
+        }
+
         let bundle = RecoveryKeyBundle(
+            epoch: epoch,
             currentVersion: currentVersion,
             keys: keys
                 .sorted { $0.key < $1.key }
@@ -108,7 +140,11 @@ actor RecoveryManager {
             updatedAt: .now
         )
 
-        try await CloudKitManager.shared.saveRecoveryEnvelope(envelope)
+        try await CloudKitManager.shared.saveRecoveryEnvelope(
+            envelope,
+            expectedEncryptedBlob: expectedEncryptedBlob
+        )
+        try await KeychainManager.shared.recordAcceptedRecoveryEpoch(epoch)
     }
 
     func fetchKeyring(
@@ -152,6 +188,12 @@ actor RecoveryManager {
             throw RecoveryError.malformedEnvelope
         }
 
+        let highestAcceptedEpoch = try await KeychainManager.shared
+            .highestAcceptedRecoveryEpoch()
+        guard bundle.epoch >= highestAcceptedEpoch else {
+            throw RecoveryError.rollbackDetected
+        }
+
         guard bundle.currentVersion > 0,
               !bundle.keys.isEmpty
         else {
@@ -175,9 +217,15 @@ actor RecoveryManager {
             throw RecoveryError.malformedEnvelope
         }
 
+        try await KeychainManager.shared.recordAcceptedRecoveryEpoch(
+            bundle.epoch
+        )
+
         return RecoveryKeyringSnapshot(
+            epoch: bundle.epoch,
             currentVersion: bundle.currentVersion,
-            keyData: result
+            keyData: result,
+            encryptedBlob: envelope.encryptedBlob
         )
     }
 
