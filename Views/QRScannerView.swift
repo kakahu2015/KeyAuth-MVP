@@ -2,6 +2,8 @@ import SwiftUI
 import VisionKit
 
 struct QRScannerView: UIViewControllerRepresentable {
+    @Environment(\.isSceneCaptured) private var isSceneCaptured
+
     let onCode: (String) -> Void
     let onError: (String) -> Void
 
@@ -20,13 +22,13 @@ struct QRScannerView: UIViewControllerRepresentable {
             isHighlightingEnabled: true
         )
         scanner.delegate = context.coordinator
+        context.coordinator.updateCaptureState(
+            isSceneCaptured,
+            scanner: scanner
+        )
 
         DispatchQueue.main.async {
-            do {
-                try scanner.startScanning()
-            } catch {
-                context.coordinator.reportError(error.localizedDescription)
-            }
+            context.coordinator.startScanningIfSafe(scanner)
         }
 
         return scanner
@@ -35,7 +37,12 @@ struct QRScannerView: UIViewControllerRepresentable {
     func updateUIViewController(
         _ uiViewController: DataScannerViewController,
         context: Context
-    ) {}
+    ) {
+        context.coordinator.updateCaptureState(
+            isSceneCaptured,
+            scanner: uiViewController
+        )
+    }
 
     static func dismantleUIViewController(
         _ uiViewController: DataScannerViewController,
@@ -47,9 +54,33 @@ struct QRScannerView: UIViewControllerRepresentable {
     final class Coordinator: NSObject, DataScannerViewControllerDelegate {
         private let parent: QRScannerView
         private var didReportCode = false
+        private var hasBeenCaptured = false
 
         init(parent: QRScannerView) {
             self.parent = parent
+        }
+
+        func updateCaptureState(
+            _ isCaptured: Bool,
+            scanner: DataScannerViewController
+        ) {
+            if isCaptured {
+                hasBeenCaptured = true
+            }
+            if hasBeenCaptured {
+                scanner.stopScanning()
+            }
+        }
+
+        func startScanningIfSafe(_ scanner: DataScannerViewController) {
+            guard !hasBeenCaptured else {
+                return
+            }
+            do {
+                try scanner.startScanning()
+            } catch {
+                reportError(error.localizedDescription)
+            }
         }
 
         func dataScanner(

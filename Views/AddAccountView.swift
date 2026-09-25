@@ -4,6 +4,8 @@ import VisionKit
 struct AddAccountView: View {
     @EnvironmentObject private var store: OTPStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isSceneCaptured) private var isSceneCaptured
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var rawURL = ""
     @State private var showScanner = false
@@ -92,6 +94,17 @@ struct AddAccountView: View {
                 }
             } message: {
                 Text(scannerError ?? "")
+            }
+        }
+        .overlay {
+            if scenePhase != .active || isSceneCaptured {
+                SensitiveContentShield(isCaptured: isSceneCaptured)
+            }
+        }
+        .onChange(of: isSceneCaptured) { _, captured in
+            if captured {
+                rawURL = ""
+                showScanner = false
             }
         }
     }

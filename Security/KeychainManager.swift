@@ -391,33 +391,42 @@ actor KeychainManager {
 
         return try makeKey(from: data)
 #else
-        context.localizedReason = String(localized: "Unlock KeyAuth recovery key.")
+        guard let data = try readProtectedRecoveryKeyData(context: context) else {
+            return nil
+        }
 
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: recoveryService,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseDataProtectionKeychain as String: true,
-            kSecUseAuthenticationContext as String: context
-        ]
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-
-        switch status {
-        case errSecSuccess:
-            guard let data = item as? Data else {
+        if data.count == 32 {
+            let wrappedData = try SecureEnclaveWrapper.wrap(data)
+            let verifiedData = try SecureEnclaveWrapper.unwrap(
+                wrappedData,
+                context: context
+            )
+            guard verifiedData == data else {
                 throw KeychainError.malformedKeyData
             }
 
-            return try makeKey(from: data)
-        case errSecItemNotFound:
-            return nil
-        default:
-            throw KeychainError.unexpectedStatus(status)
+            try updateProtectedMasterKeyData(
+                wrappedData,
+                service: recoveryService,
+                context: context
+            )
+            guard let migratedWrappedData = try readProtectedRecoveryKeyData(
+                context: context
+            ) else {
+                throw KeychainError.masterKeyUnavailable
+            }
+            let migratedData = try SecureEnclaveWrapper.unwrap(
+                migratedWrappedData,
+                context: context
+            )
+            guard migratedData == data else {
+                throw KeychainError.malformedKeyData
+            }
+            return try makeKey(from: migratedData)
         }
+
+        let rawData = try SecureEnclaveWrapper.unwrap(data, context: context)
+        return try makeKey(from: rawData)
 #endif
     }
 
@@ -429,6 +438,7 @@ actor KeychainManager {
 #if targetEnvironment(simulator)
         UserDefaults.standard.set(data, forKey: simulatorRecoveryKey)
 #else
+        let wrappedData = try SecureEnclaveWrapper.wrap(data)
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: recoveryService,
@@ -444,7 +454,7 @@ actor KeychainManager {
         }
 
         _ = try storeProtectedMasterKeyData(
-            data,
+            wrappedData,
             service: recoveryService
         )
 #endif
@@ -536,6 +546,35 @@ actor KeychainManager {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
 
+        switch status {
+        case errSecSuccess:
+            guard let data = item as? Data else {
+                throw KeychainError.malformedKeyData
+            }
+            return data
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw KeychainError.unexpectedStatus(status)
+        }
+    }
+
+    private func readProtectedRecoveryKeyData(
+        context: LAContext
+    ) throws -> Data? {
+        context.localizedReason = String(localized: "Unlock KeyAuth recovery key.")
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: recoveryService,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true,
+            kSecUseAuthenticationContext as String: context
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
         switch status {
         case errSecSuccess:
             guard let data = item as? Data else {
