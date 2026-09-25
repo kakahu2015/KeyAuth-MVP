@@ -357,120 +357,120 @@
         }
       }
     },
-    "After generating a recovery key, you can recover on a new iPhone or iPad." : {
+    "After generating a recovery key, you can recover on a new iPhone." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "بعد إنشاء مفتاح استرداد، يمكنك الاسترداد على iPhone أو iPad جديد."
+            "value" : "بعد إنشاء مفتاح استرداد، يمكنك الاسترداد على iPhone جديد."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nach dem Erstellen eines Wiederherstellungsschlüssels kannst du auf einem neuen iPhone oder iPad wiederherstellen."
+            "value" : "Nach dem Erstellen eines Wiederherstellungsschlüssels kannst du auf einem neuen iPhone wiederherstellen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Después de generar una clave de recuperación, puedes recuperar tus códigos en un iPhone o iPad nuevo."
+            "value" : "Después de generar una clave de recuperación, puedes recuperar tus códigos en un iPhone nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Après avoir généré une clé de récupération, vous pourrez récupérer vos codes sur un nouvel iPhone ou iPad."
+            "value" : "Après avoir généré une clé de récupération, vous pourrez récupérer vos codes sur un nouvel iPhone."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "पुनर्प्राप्ति कुंजी बनाने के बाद आप नए iPhone या iPad पर पुनर्प्राप्त कर सकते हैं।"
+            "value" : "पुनर्प्राप्ति कुंजी बनाने के बाद आप नए iPhone पर पुनर्प्राप्त कर सकते हैं।"
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Setelah membuat kunci pemulihan, Anda dapat memulihkan di iPhone atau iPad baru."
+            "value" : "Setelah membuat kunci pemulihan, Anda dapat memulihkan di iPhone baru."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dopo aver generato una chiave di recupero, puoi recuperare i codici su un nuovo iPhone o iPad."
+            "value" : "Dopo aver generato una chiave di recupero, puoi recuperare i codici su un nuovo iPhone."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "復元キーを生成すると、新しいiPhoneまたはiPadで復元できます。"
+            "value" : "復元キーを生成すると、新しいiPhoneで復元できます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "복구 키를 생성하면 새 iPhone 또는 iPad에서 복구할 수 있습니다."
+            "value" : "복구 키를 생성하면 새 iPhone에서 복구할 수 있습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nadat je een herstelsleutel hebt gemaakt, kun je herstellen op een nieuwe iPhone of iPad."
+            "value" : "Nadat je een herstelsleutel hebt gemaakt, kun je herstellen op een nieuwe iPhone."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Po utworzeniu klucza odzyskiwania możesz odzyskać dane na nowym iPhonie lub iPadzie."
+            "value" : "Po utworzeniu klucza odzyskiwania możesz odzyskać dane na nowym iPhonie."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Depois de gerar uma chave de recuperação, você poderá recuperar os códigos em um novo iPhone ou iPad."
+            "value" : "Depois de gerar uma chave de recuperação, você poderá recuperar os códigos em um novo iPhone."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "После создания ключа восстановления можно восстановить данные на новом iPhone или iPad."
+            "value" : "После создания ключа восстановления можно восстановить данные на новом iPhone."
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "หลังจากสร้างคีย์กู้คืน คุณสามารถกู้คืนบน iPhone หรือ iPad เครื่องใหม่ได้"
+            "value" : "หลังจากสร้างคีย์กู้คืน คุณสามารถกู้คืนบน iPhone เครื่องใหม่ได้"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bir kurtarma anahtarı oluşturduktan sonra yeni bir iPhone veya iPad'de kurtarma yapabilirsiniz."
+            "value" : "Bir kurtarma anahtarı oluşturduktan sonra yeni bir iPhone'da kurtarma yapabilirsiniz."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Після створення ключа відновлення можна відновити дані на новому iPhone або iPad."
+            "value" : "Після створення ключа відновлення можна відновити дані на новому iPhone."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sau khi tạo khóa khôi phục, bạn có thể khôi phục trên iPhone hoặc iPad mới."
+            "value" : "Sau khi tạo khóa khôi phục, bạn có thể khôi phục trên iPhone mới."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成恢复密钥后，可在新的 iPhone 或 iPad 上恢复。"
+            "value" : "生成恢复密钥后，可在新的 iPhone 上恢复。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "產生復原金鑰後，可在新的 iPhone 或 iPad 上復原。"
+            "value" : "產生復原金鑰後，可在新的 iPhone 上復原。"
           }
         }
       }
