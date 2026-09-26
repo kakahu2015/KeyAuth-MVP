@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP to prywatny generator kodów jednorazowych opartych na czasie (TOTP).\n\nGeneruj kody weryfikacyjne na iPhonie, także offline. Twój sejf jest szyfrowany na urządzeniu i chroniony przez Face ID lub kod urządzenia.\n\nOpcjonalna synchronizacja iCloud zapisuje zaszyfrowane dane kont w Twojej prywatnej bazie iCloud. Osobny klucz odzyskiwania pozwala przywrócić sejf na nowym iPhonie. Przechowuj klucz w bezpiecznym miejscu.\n\nFunkcje\n• Generowanie kodów TOTP offline\n• Dodawanie kont przez skanowanie kodu QR\n• Szyfrowanie danych kont na urządzeniu\n• Ochrona dostępu przez Face ID lub kod urządzenia\n• Opcjonalna synchronizacja zaszyfrowanych danych przez iCloud\n• Przywracanie sejfu za pomocą klucza odzyskiwania\n• Bez reklam i śledzenia\n\nKeyAuth OTP nie korzysta z własnego serwera aplikacji. iCloud przechowuje zaszyfrowane dane kont, nie Twoje sekrety TOTP ani klucz odzyskiwania. Zapisz klucz przed zmianą urządzenia: same dane iCloud nie odblokują sejfu.",
+  "keywords": "uwierzytelnianie,2fa,totp,otp,kod,bezpieczenstwo,prywatnosc,icloud,faceid",
+  "promotionalText": "Prywatne 2FA: kody TOTP offline, szyfrowanie na urządzeniu, Face ID lub kod, opcjonalna synchronizacja iCloud i odzyskiwanie.",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "Informacje w App Store w większej liczbie języków i zaktualizowane szczegóły aplikacji."
+}

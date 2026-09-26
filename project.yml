@@ -9,6 +9,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     PRODUCT_BUNDLE_IDENTIFIER: org.kakahu.KeyAuth
+    MARKETING_VERSION: "1.1"
+    CURRENT_PROJECT_VERSION: "2"
     KEYAUTH_CLOUD_CONTAINER: iCloud.org.kakahu.KeyAuth
     DEVELOPMENT_TEAM: 5C6T6Y2Y22
     CODE_SIGN_STYLE: Automatic
@@ -31,6 +33,7 @@ targets:
     info:
       path: Info.plist
       properties:
+        ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: KeyAuth uses the camera to scan TOTP QR codes.
         NSFaceIDUsageDescription: KeyAuth uses Face ID or your device passcode to protect verification codes.
         UILaunchScreen: {}

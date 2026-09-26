@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP, zamana dayalı tek kullanımlık parolalar (TOTP) için özel bir kimlik doğrulayıcıdır.\n\nÇevrimdışıyken bile iPhone'da doğrulama kodları oluşturun. Kasanız aygıtınızda şifrelenir ve Face ID ya da aygıt parolanızla korunur.\n\nİsteğe bağlı iCloud eşzamanlama, şifrelenmiş hesap verilerini özel iCloud veritabanınızda saklar. Ayrı bir Kurtarma Anahtarı, kasanızı yeni bir iPhone'da geri yüklemenizi sağlar. Anahtarı güvenli bir yerde saklayın.\n\nÖzellikler\n• Çevrimdışı TOTP kodları oluşturma\n• QR kodu tarayarak hesap ekleme\n• Hesap bilgilerini aygıtta şifreleme\n• Erişimi Face ID veya aygıt parolasıyla koruma\n• Şifrelenmiş verileri isteğe bağlı olarak iCloud ile eşzamanlama\n• Kasayı Kurtarma Anahtarı ile geri yükleme\n• Reklam ve izleme yok\n\nKeyAuth OTP kendi uygulama sunucusunu kullanmaz. iCloud, şifrelenmiş hesap verilerini saklar; TOTP sırlarınızı veya Kurtarma Anahtarınızı saklamaz. Aygıt değiştirmeden önce anahtarı kaydedin: iCloud verileri tek başına kasanın kilidini açamaz.",
+  "keywords": "kimlikdogrulama,2fa,totp,otp,kod,guvenlik,gizlilik,icloud,faceid",
+  "promotionalText": "Çevrimdışı TOTP, aygıtta şifreleme, Face ID veya parola koruması, isteğe bağlı şifreli iCloud eşzamanlama ve kurtarma anahtarıyla özel 2FA.",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "App Store bilgileri daha fazla dilde sunuluyor ve uygulama ayrıntıları güncellendi."
+}

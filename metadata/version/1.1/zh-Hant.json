@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP 是一款用於基於時間的一次性密碼（TOTP）的私人驗證器。\n\n即使離線，也能在 iPhone 上產生驗證碼。保險庫會在裝置上加密，並由 Face ID 或裝置密碼保護。\n\n選擇開啟 iCloud 同步後，加密的帳戶資料會儲存在你的 iCloud 私有資料庫。你可以使用獨立的復原金鑰，在新的 iPhone 上還原保險庫。請將復原金鑰保存在安全的地方。\n\n功能\n• 離線產生 TOTP 驗證碼\n• 掃描 QR Code 新增帳戶\n• 在裝置上加密帳戶資料\n• 使用 Face ID 或裝置密碼保護存取\n• 選擇透過 iCloud 同步加密資料\n• 使用復原金鑰還原保險庫\n• 無廣告、無追蹤\n\nKeyAuth OTP 不使用自有應用程式伺服器。iCloud 儲存的是加密後的帳戶資料，不包含你的 TOTP 秘密或復原金鑰。更換裝置前請先保存復原金鑰：單靠 iCloud 資料無法解鎖保險庫。",
+  "keywords": "驗證,2fa,totp,otp,驗證碼,安全,隱私,icloud,faceid",
+  "promotionalText": "私密雙重驗證：離線 TOTP、裝置本機加密、Face ID 或密碼保護、選擇性加密 iCloud 同步，並支援復原金鑰。",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "App Store 資訊已新增多語系版本，並更新了 App 介紹。"
+}

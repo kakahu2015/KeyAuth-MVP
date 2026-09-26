@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP 是一款用于基于时间的一次性密码（TOTP）的私密验证器。\n\n即使离线，也可以在 iPhone 上生成验证码。保险库在设备本地加密，并由 Face ID 或设备密码保护。\n\n开启可选的 iCloud 同步后，加密的账户数据会保存到你的 iCloud 私有数据库。你可以使用独立的恢复密钥在新 iPhone 上恢复保险库。请将恢复密钥保存在安全的位置。\n\n功能\n• 离线生成 TOTP 验证码\n• 扫描二维码添加账户\n• 在设备本地加密账户信息\n• 使用 Face ID 或设备密码保护访问\n• 可选通过 iCloud 同步加密数据\n• 使用恢复密钥恢复保险库\n• 无广告、无跟踪\n\nKeyAuth OTP 不使用自有应用服务器。iCloud 保存的是加密后的账户数据，不包含你的 TOTP 密钥或恢复密钥。更换设备前请保存恢复密钥：仅凭 iCloud 数据无法解锁保险库。",
+  "keywords": "验证,2fa,totp,otp,验证码,安全,隐私,icloud,faceid",
+  "promotionalText": "私密双重验证：离线 TOTP、设备本地加密、Face ID 或密码保护、可选加密 iCloud 同步，并支持恢复密钥。",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "App Store 信息已新增多语言版本，并更新了应用介绍。"
+}

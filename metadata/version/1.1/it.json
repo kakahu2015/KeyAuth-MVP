@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP è un autenticatore privato per password monouso basate sul tempo (TOTP).\n\nGenera codici di verifica sul tuo iPhone, anche offline. Il tuo archivio è crittografato sul dispositivo e protetto con Face ID o il codice del dispositivo.\n\nLa sincronizzazione iCloud facoltativa salva i dati degli account crittografati nel tuo database iCloud privato. Una chiave di recupero separata consente di ripristinare l’archivio su un nuovo iPhone. Conservala in un luogo sicuro.\n\nFunzionalità\n• Genera codici TOTP offline\n• Aggiungi account scansionando un codice QR\n• Crittografa i dati degli account sul dispositivo\n• Proteggi l’accesso con Face ID o il codice del dispositivo\n• Sincronizza facoltativamente i dati crittografati tramite iCloud\n• Ripristina l’archivio con la chiave di recupero\n• Niente pubblicità né tracciamento\n\nKeyAuth OTP non usa un server applicativo. iCloud archivia dati degli account crittografati, non i segreti TOTP né la chiave di recupero. Salvala prima di cambiare dispositivo: i soli dati di iCloud non possono sbloccare l’archivio.",
+  "keywords": "autenticatore,2fa,totp,otp,codice,sicurezza,privacy,icloud,faceid",
+  "promotionalText": "2FA privata con codici TOTP offline, crittografia sul dispositivo, protezione Face ID o codice, sync iCloud cifrata e recupero.",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "Informazioni localizzate sull’App Store e dettagli dell’app aggiornati."
+}

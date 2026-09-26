@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP là ứng dụng xác thực riêng tư cho mật khẩu dùng một lần dựa trên thời gian (TOTP).\n\nTạo mã xác minh trên iPhone ngay cả khi ngoại tuyến. Kho lưu trữ được mã hóa trên thiết bị và bảo vệ bằng Face ID hoặc mật mã thiết bị.\n\nTùy chọn đồng bộ iCloud lưu dữ liệu tài khoản đã mã hóa trong cơ sở dữ liệu iCloud riêng tư của bạn. Khóa khôi phục riêng giúp bạn khôi phục kho lưu trữ trên iPhone mới. Hãy cất khóa ở nơi an toàn.\n\nTính năng\n• Tạo mã TOTP ngoại tuyến\n• Thêm tài khoản bằng cách quét mã QR\n• Mã hóa thông tin tài khoản trên thiết bị\n• Bảo vệ quyền truy cập bằng Face ID hoặc mật mã thiết bị\n• Tùy chọn đồng bộ dữ liệu đã mã hóa qua iCloud\n• Khôi phục kho lưu trữ bằng khóa khôi phục\n• Không quảng cáo hoặc theo dõi\n\nKeyAuth OTP không dùng máy chủ ứng dụng riêng. iCloud lưu dữ liệu tài khoản đã mã hóa, không lưu bí mật TOTP hoặc khóa khôi phục. Hãy lưu khóa trước khi đổi thiết bị: chỉ dữ liệu iCloud thì không thể mở khóa kho lưu trữ.",
+  "keywords": "xacthuc,2fa,totp,otp,ma,baomat,riengtu,icloud,faceid",
+  "promotionalText": "2FA riêng tư với TOTP ngoại tuyến, mã hóa trên thiết bị, bảo vệ Face ID hoặc mật mã, đồng bộ iCloud tùy chọn và khóa khôi phục.",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "Thông tin App Store được bản địa hóa và chi tiết ứng dụng được cập nhật."
+}

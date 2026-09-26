@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP is a private authenticator for time-based one-time passwords (TOTP).\n\nCreate verification codes on your iPhone, even offline. Your vault is encrypted on your device and protected by Face ID or your device passcode.\n\nOptional iCloud sync stores encrypted account data in your private iCloud database. A separate Recovery Key can restore your vault on a new iPhone. Keep the key somewhere safe.\n\nFeatures\n• Generate TOTP verification codes offline\n• Add accounts by scanning a QR code\n• Encrypt account details on your device\n• Protect access with Face ID or your device passcode\n• Optionally sync encrypted data through iCloud\n• Restore your vault on a new iPhone with your Recovery Key\n• No ads or tracking\n\nKeyAuth OTP has no app server. iCloud stores encrypted account data, not your TOTP secrets or Recovery Key. Save your Recovery Key before switching devices: iCloud data alone cannot unlock your vault.",
+  "keywords": "authenticator,2fa,totp,otp,security,privacy,icloud,faceid,verification,code",
+  "promotionalText": "Private two-factor authentication with offline TOTP codes, on-device encryption, Face ID or passcode protection, optional encrypted iCloud sync, and Recovery Key restore.",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "Localized App Store information and updated app details."
+}

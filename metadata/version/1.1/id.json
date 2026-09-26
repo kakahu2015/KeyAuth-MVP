@@ -1,0 +1,7 @@
+{
+  "description": "KeyAuth OTP adalah autentikator privat untuk kata sandi sekali pakai berbasis waktu (TOTP).\n\nBuat kode verifikasi di iPhone, bahkan saat offline. Vault Anda dienkripsi di perangkat dan dilindungi Face ID atau kode sandi perangkat.\n\nSinkronisasi iCloud opsional menyimpan data akun terenkripsi di database iCloud pribadi Anda. Kunci pemulihan terpisah dapat memulihkan vault di iPhone baru. Simpan kunci dengan aman.\n\nFitur\n• Buat kode TOTP secara offline\n• Tambahkan akun dengan memindai kode QR\n• Enkripsi detail akun di perangkat\n• Lindungi akses dengan Face ID atau kode sandi perangkat\n• Sinkronkan data terenkripsi melalui iCloud secara opsional\n• Pulihkan vault dengan Kunci Pemulihan\n• Tanpa iklan dan pelacakan\n\nKeyAuth OTP tidak memiliki server aplikasi sendiri. iCloud hanya menyimpan data akun terenkripsi, bukan rahasia TOTP atau Kunci Pemulihan Anda. Simpan kunci sebelum berganti perangkat: data iCloud saja tidak dapat membuka vault.",
+  "keywords": "autentikator,2fa,totp,otp,kode,keamanan,privasi,icloud,faceid",
+  "promotionalText": "2FA privat dengan kode TOTP offline, enkripsi di perangkat, perlindungan Face ID atau kode sandi, sinkronisasi iCloud terenkripsi dan pemulihan.",
+  "supportUrl": "https://keytop.kakahu.org/",
+  "whatsNew": "Informasi App Store dalam lebih banyak bahasa dan detail aplikasi yang diperbarui."
+}
