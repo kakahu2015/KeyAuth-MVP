@@ -158,6 +158,17 @@ struct ContentView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
+                    Link(
+                        destination: URL(
+                            string: "https://apps.apple.com/us/app/keyauth-otp/id6814867894?l=zh-Hans-CN"
+                        )!
+                    ) {
+                        Image(systemName: "bag")
+                    }
+                    .accessibilityLabel("View KeyAuth on the App Store")
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showAdd = true
                     } label: {
