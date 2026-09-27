@@ -1,0 +1,53 @@
+{
+  "specVersion": "0.9",
+  "host": {
+    "displayName": "KeyAuth",
+    "identifier": "keytop.kakahu.org"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:keytop.kakahu.org:web:product",
+      "displayName": "KeyAuth product website",
+      "type": "text/html",
+      "url": "https://keytop.kakahu.org/",
+      "representativeQueries": [
+        "What is KeyAuth?",
+        "How does KeyAuth encrypt TOTP accounts?",
+        "Which iPhone and iOS versions does KeyAuth support?"
+      ]
+    },
+    {
+      "identifier": "urn:air:keytop.kakahu.org:web:privacy",
+      "displayName": "KeyAuth privacy information",
+      "type": "text/html",
+      "url": "https://keytop.kakahu.org/privacy",
+      "representativeQueries": [
+        "What account data does KeyAuth store in iCloud?",
+        "How does KeyAuth protect recovery keys?",
+        "What information can KeyAuth receive from website visitors?"
+      ]
+    },
+    {
+      "identifier": "urn:air:keytop.kakahu.org:source:github",
+      "displayName": "KeyAuth open-source project",
+      "type": "text/html",
+      "url": "https://github.com/kakahu2015/KeyAuth-MVP",
+      "representativeQueries": [
+        "Where can I inspect the KeyAuth source code?",
+        "How does KeyAuth implement local encryption and CloudKit sync?",
+        "Where is the KeyAuth website source maintained?"
+      ]
+    },
+    {
+      "identifier": "urn:air:keytop.kakahu.org:app:app-store",
+      "displayName": "KeyAuth on the App Store",
+      "type": "text/html",
+      "url": "https://apps.apple.com/us/app/keyauth-otp/id6814867894?l=zh-Hans-CN",
+      "representativeQueries": [
+        "Where can I download KeyAuth for iPhone?",
+        "What is the App Store listing for KeyAuth OTP?",
+        "Is KeyAuth available on the Apple App Store?"
+      ]
+    }
+  ]
+}

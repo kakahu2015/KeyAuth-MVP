@@ -275,8 +275,38 @@ const pageMetadata = {
 };
 
 const languageToggle = document.querySelector("[data-language-toggle]");
-let currentLanguage = "en";
 const pageKey = document.body.dataset.page === "privacy" ? "privacy" : "home";
+
+function getBrowserLanguage() {
+  const preferredLanguages = [
+    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+    navigator.language
+  ];
+
+  for (const preferredLanguage of preferredLanguages) {
+    const languageCode = preferredLanguage?.split("-")[0].toLowerCase();
+    if (languageCode === "zh") return "zh";
+    if (languageCode === "en") return "en";
+  }
+
+  return "en";
+}
+
+function getSavedLanguagePreference() {
+  try {
+    const savedLanguage = localStorage.getItem("keyauth-language");
+    const isExplicitPreference = localStorage.getItem("keyauth-language-explicit") === "true";
+
+    if (savedLanguage !== "en" && savedLanguage !== "zh") return null;
+    if (isExplicitPreference || savedLanguage === "zh") return savedLanguage;
+  } catch {
+    // Browser-language detection should work when storage is unavailable.
+  }
+
+  return null;
+}
+
+let currentLanguage = getSavedLanguagePreference() ?? getBrowserLanguage();
 
 function applyLanguage(language) {
   currentLanguage = language === "en" ? "en" : "zh";
@@ -313,23 +343,19 @@ function applyLanguage(language) {
     languageToggle.querySelector("[data-language-other]").textContent = currentLanguage === "en" ? "中" : "EN";
   }
 
-  try {
-    localStorage.setItem("keyauth-language", currentLanguage);
-  } catch {
-    // Private browsing or blocked storage should not disable language switching.
-  }
 }
 
 languageToggle?.addEventListener("click", () => {
-  applyLanguage(currentLanguage === "zh" ? "en" : "zh");
-});
+  const selectedLanguage = currentLanguage === "zh" ? "en" : "zh";
+  applyLanguage(selectedLanguage);
 
-try {
-  const storedLanguage = localStorage.getItem("keyauth-language");
-  if (storedLanguage === "en" || storedLanguage === "zh") currentLanguage = storedLanguage;
-} catch {
-  // Use the Chinese default when local storage is unavailable.
-}
+  try {
+    localStorage.setItem("keyauth-language", selectedLanguage);
+    localStorage.setItem("keyauth-language-explicit", "true");
+  } catch {
+    // Private browsing or blocked storage should not disable language switching.
+  }
+});
 
 applyLanguage(currentLanguage);
 
