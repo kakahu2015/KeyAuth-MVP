@@ -147,6 +147,16 @@ New records use AES-GCM associated data binding the record UUID and schema
 version. Version 1 MVP records remain readable through a legacy read-only
 fallback so an upgrade does not silently discard existing accounts.
 
+Tap a verification code to copy it to a device-local clipboard that expires when
+the code expires. Search matches display names, issuers, account names, and groups.
+Set a group in Edit Account and use the group filter to narrow the list.
+
+The backup/import menu exports all accounts and groups as an AES-256-GCM
+encrypted JSON file. Each export uses an independent random 256-bit `KAB1-…`
+backup key. Save that key separately from the file; the `KA1-…` recovery key
+does not open exported files. Import validates the complete backup before
+writing, preserves existing accounts, and skips duplicate credentials.
+
 Account names can be edited after import. The custom display name is encrypted
 inside the same payload; clearing it restores the name from the QR code. Swipe
 an account to edit or delete it. Deleting removes it from the local vault
@@ -164,7 +174,8 @@ migrates the previous synchronizable v1 key into the new device-bound v2
 Keychain item. Cross-device recovery can be enabled from the key button. The
 app generates a separate `KA1-…` Recovery Key, encrypts the local master-key
 ring with it, and stores only that encrypted Recovery Envelope in CloudKit.
-The Recovery Key itself is not uploaded and must be saved by the user.
+The Recovery Key itself is not uploaded and must be saved by the user. The
+setup screen requires confirmation that the key was saved before dismissal.
 
 On a new device, enter the saved Recovery Key when prompted. The app decrypts
 the envelope, reinstalls the recovered master-key versions into the local
@@ -177,8 +188,8 @@ queues the CloudKit deletion; after it syncs, it cannot be restored by
 reinstalling the app. Uninstalling the app does not delete CloudKit records.
 
 This is encrypted iCloud backup/sync, not a plaintext export. The current debug
-build uses the Development CloudKit environment; a release build must deploy
-the schema to Production and use the Production environment.
+build uses the Development CloudKit environment; Release configuration selects the Production environment. Before shipping,
+verify the deployed schema and inspect the effective signed archive entitlements.
 
 ## Security notes before production
 
@@ -190,8 +201,8 @@ Still required before release:
 - development CloudKit schema creation and production deployment
 - real-device testing of the protected Keychain item and authentication flow
 - real-device recovery and key-rotation testing
-- CloudKit change subscriptions and conflict handling
-- secure clipboard behavior for any future copy action
+- CloudKit change subscriptions and real-device conflict validation
+- real-device verification of clipboard expiry
 - migration and backup tests
 - HOTP decision (currently rejected)
 - RFC test vectors/unit tests
@@ -199,8 +210,20 @@ Still required before release:
 
 ## Important recovery property
 
-Because the P0 master key is device-bound, deleting the trusted device may make
-the CloudKit ciphertext unrecoverable until the independent Recovery Key
-mechanism is implemented.
+The master key is device-bound. If all trusted devices are lost, recovery requires
+both the independently saved Recovery Key and the encrypted data in iCloud.
+Generating a key alone does not prove that all accounts have finished uploading.
 
-That is intentional for a zero-knowledge design, but the production app must explain this clearly and provide a carefully designed recovery mechanism.
+Sync tracks the CloudKit revision last seen by this device. If an offline edit
+conflicts with another device's update, the local edit stays queued until the
+user chooses the local or iCloud version. Missing query results are checked by
+record ID before a previously acknowledged record is treated as deleted.
+Remote deletion takes precedence over a queued edit of an acknowledged record.
+For older records without a saved cloud revision, a missing cloud record requires
+an explicit choice to upload the local record or remove it locally. A differing
+cloud record also requires a choice rather than an automatic overwrite.
+
+Local add, edit, delete, and batch import do not wait for network sync. The local
+vault persists upload intent; a successful response only acknowledges the
+ciphertext actually uploaded. Newer local edits remain queued, and a delete
+made during an upload cannot be undone by that upload's response.

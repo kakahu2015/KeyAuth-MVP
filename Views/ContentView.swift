@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject private var store: OTPStore
@@ -6,10 +7,32 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isSceneCaptured) private var isSceneCaptured
 
+    @State private var searchText = ""
+    @State private var selectedGroup: String?
+    @State private var showTransfer = false
     @State private var showAdd = false
     @State private var showRecovery = false
     @State private var accountToEdit: OTPStore.DecryptedAccount?
     @State private var accountToDelete: OTPStore.DecryptedAccount?
+
+    private var filteredAccounts: [OTPStore.DecryptedAccount] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return store.accounts.filter { account in
+            let payload = account.payload
+            let matchesGroup = selectedGroup == nil || (payload.groupName ?? "") == selectedGroup
+            let matchesSearch = query.isEmpty ||
+                payload.displayTitle.localizedCaseInsensitiveContains(query) ||
+                payload.issuer.localizedCaseInsensitiveContains(query) ||
+                payload.accountName.localizedCaseInsensitiveContains(query) ||
+                (payload.groupName ?? "").localizedCaseInsensitiveContains(query)
+            return matchesGroup && matchesSearch
+        }
+    }
+
+    private var groups: [String] {
+        Array(Set(store.accounts.compactMap { $0.payload.groupName }.filter { !$0.isEmpty }))
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
 
     var body: some View {
         Group {
@@ -53,17 +76,36 @@ struct ContentView: View {
             }
         }
         .alert(
-            "Error",
+            store.conflictingAccountID == nil ? String(localized: "Error") : String(localized: "Sync conflict"),
             isPresented: Binding(
-                get: { store.lastError != nil },
-                set: { if !$0 { store.clearError() } }
+                get: { !appLock.isLocked && !store.isResolvingConflict && (store.conflictingAccountID != nil || store.lastError != nil) },
+                set: { if !$0 && store.conflictingAccountID == nil { store.clearError() } }
             )
         ) {
-            Button("OK") {
-                store.clearError()
+            if store.conflictingAccountID != nil {
+                Button("Keep this device's version") {
+                    Task { await store.resolveConflict(keepLocal: true) }
+                }
+                Button("Use iCloud's version") {
+                    Task { await store.resolveConflict(keepLocal: false) }
+                }
+            } else {
+                Button("OK") { store.clearError() }
             }
         } message: {
-            Text(store.lastError ?? "")
+            if let id = store.conflictingAccountID {
+                if let account = store.accounts.first(where: { $0.id == id }) {
+                    Text(account.payload.displayTitle)
+                }
+                if store.conflictRemoteMissing {
+                    Text("This older account is missing from iCloud. Keep this device's version to upload it again, or use iCloud's version to remove it from this device.")
+                } else {
+                    Text("This account changed on another device. Your local change is saved until you choose which version to keep.")
+                }
+                if let error = store.lastError { Text(error) }
+            } else {
+                Text(store.lastError ?? "")
+            }
         }
     }
 
@@ -104,8 +146,11 @@ struct ContentView: View {
                                 .font(.footnote)
                         }
                         StorageModeLabel(isCloudSyncEnabled: store.isCloudSyncEnabled)
+                        if filteredAccounts.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                        }
                         TimelineView(.periodic(from: .now, by: 1)) { context in
-                            ForEach(store.accounts) { account in
+                            ForEach(filteredAccounts) { account in
                                 OTPRow(
                                     account: account,
                                     code: store.code(
@@ -146,6 +191,12 @@ struct ContentView: View {
                     }
                 }
             }
+            .onChange(of: groups) { _, updated in
+                if let selectedGroup, !selectedGroup.isEmpty, !updated.contains(selectedGroup) {
+                    self.selectedGroup = nil
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search accounts")
             .navigationTitle("KeyAuth")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -155,6 +206,23 @@ struct ContentView: View {
                         Image(systemName: "key.horizontal.fill")
                     }
                     .disabled(!store.isReady || store.isLoading)
+                }
+
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Picker("Group", selection: $selectedGroup) {
+                            Text("All accounts").tag(nil as String?)
+                            Text("Ungrouped").tag(Optional(""))
+                            ForEach(groups, id: \.self) { group in
+                                Text(group).tag(Optional(group))
+                            }
+                        }
+                        Button("Encrypted backup and import") { showTransfer = true }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                    }
+                    .disabled(!store.isReady || store.isLoading)
+                    .accessibilityLabel("Groups and backup")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -183,6 +251,9 @@ struct ContentView: View {
             .sheet(isPresented: $showRecovery) {
                 RecoverySetupView()
             }
+            .sheet(isPresented: $showTransfer) {
+                VaultTransferView()
+            }
             .sheet(item: $accountToEdit) { account in
                 EditAccountView(account: account)
             }
@@ -206,7 +277,7 @@ struct ContentView: View {
                 }
             } message: {
                 Text(
-                    "Deleting removes the account from this device immediately and deletes the cloud record after iCloud reconnects. It cannot be recovered after sync completes."
+                    "Deleting removes the account from this device immediately and deletes the cloud record after iCloud reconnects. An older exported backup may still contain it."
                 )
             }
         }
@@ -301,6 +372,7 @@ private struct OTPRow: View {
     let account: OTPStore.DecryptedAccount
     let code: String
     let remaining: Int
+    @State private var copied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -318,9 +390,30 @@ private struct OTPRow: View {
 
                 Spacer()
 
-                Text(code)
-                    .font(.system(.title2, design: .monospaced))
-                    .fontWeight(.semibold)
+                Button {
+                    guard code != "------" else { return }
+                    UIPasteboard.general.setItems(
+                        [[UIPasteboard.typeAutomatic: code]],
+                        options: [
+                            .localOnly: true,
+                            .expirationDate: Date().addingTimeInterval(TimeInterval(remaining))
+                        ]
+                    )
+                    copied = true
+                } label: {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(code)
+                            .font(.system(.title2, design: .monospaced))
+                            .fontWeight(.semibold)
+                        if copied {
+                            Text("Copied")
+                                .font(.caption)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Copy verification code")
+                .onChange(of: code) { _, _ in copied = false }
             }
 
             ProgressView(

@@ -8,6 +8,7 @@ struct RecoverySetupView: View {
 
     @State private var recoveryCode: String?
     @State private var isWorking = false
+    @State private var savedRecoveryKey = false
 
     var body: some View {
         NavigationStack {
@@ -34,6 +35,7 @@ struct RecoverySetupView: View {
                         .padding()
                         .background(.secondary.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Toggle("I saved my recovery key in a safe place", isOn: $savedRecoveryKey)
                 } else if store.recoveryEnabled {
                     ContentUnavailableView(
                         "Recovery enabled",
@@ -71,10 +73,14 @@ struct RecoverySetupView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
+                        if recoveryCode != nil { store.confirmRecoveryKeySaved() }
                         dismiss()
                     }
+                    .disabled(isWorking || (recoveryCode != nil && !savedRecoveryKey))
                 }
             }
         }
+        .onAppear { recoveryCode = store.pendingRecoveryCode() }
+        .interactiveDismissDisabled(isWorking || (recoveryCode != nil && !savedRecoveryKey))
     }
 }

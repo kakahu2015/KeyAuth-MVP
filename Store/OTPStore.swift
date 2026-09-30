@@ -7,6 +7,7 @@ enum OTPStoreError: LocalizedError {
     case cloudAccountUnavailable
     case masterKeyUnavailable
     case accountNotFound
+    case syncIncomplete
     case undecryptableRecord
 
     var errorDescription: String? {
@@ -17,6 +18,8 @@ enum OTPStoreError: LocalizedError {
             return String(localized: "The KeyAuth master key is unavailable.")
         case .accountNotFound:
             return String(localized: "The account is no longer available. Refresh and try again.")
+        case .syncIncomplete:
+            return String(localized: "Your data is available on this device, but iCloud has not synced yet. Tap to retry.")
         case .undecryptableRecord:
             return String(
                 localized: "A CloudKit account could not be decrypted. The app kept the data instead of hiding it."
@@ -28,6 +31,9 @@ enum OTPStoreError: LocalizedError {
 @MainActor
 final class OTPStore: ObservableObject {
     @Published private(set) var accounts: [DecryptedAccount] = []
+    @Published private(set) var conflictingAccountID: UUID?
+    @Published private(set) var conflictRemoteMissing = false
+    @Published private(set) var isResolvingConflict = false
     @Published var lastError: String?
     @Published var isLoading = false
     @Published private(set) var isReady = false
@@ -43,6 +49,7 @@ final class OTPStore: ObservableObject {
     }
 
     private var masterKeys: [Int: SymmetricKey] = [:]
+    private var vaultSessionID: UUID?
     private var currentKeyVersion = 1
     private var recoveryKey: SymmetricKey?
 
@@ -52,6 +59,7 @@ final class OTPStore: ObservableObject {
 
     private var cloudOwner: String?
     private var syncTask: Task<Void, Never>?
+    private var syncID: UUID?
     private var syncRequested = false
     private let deletedIDsKey = "KeyAuth.ConfirmedDeletedAccountIDs"
     private let cloudOwnerKey = "KeyAuth.CloudOwner.v1"
@@ -90,6 +98,7 @@ final class OTPStore: ObservableObject {
         isLoading = true
         lastError = nil
         syncMessage = nil
+        vaultSessionID = UUID()
         masterKeys = keys
         currentKeyVersion = currentVersion
         self.recoveryKey = recoveryKey
@@ -101,11 +110,11 @@ final class OTPStore: ObservableObject {
                 throw OTPStoreError.masterKeyUnavailable
             }
 
-            let localEncrypted = try await LocalEncryptedStore.shared.fetchAll()
-            let uniqueEncrypted = try await removeExactDuplicates(
+            let localEncrypted = try LocalEncryptedStore.shared.fetchAll()
+            let uniqueEncrypted = try removeExactDuplicates(
                 from: localEncrypted
             )
-            try await installLocalAccounts(uniqueEncrypted)
+            try installLocalAccounts(uniqueEncrypted)
             isReady = true
             isLoading = false
             startPendingUploads()
@@ -123,7 +132,9 @@ final class OTPStore: ObservableObject {
     }
 
     func lock() {
+        vaultSessionID = nil
         syncTask?.cancel()
+        syncID = nil
         syncTask = nil
         syncRequested = false
         masterKeys = [:]
@@ -143,10 +154,14 @@ final class OTPStore: ObservableObject {
         await syncTask?.value
 
         if isCloudSyncEnabled {
-            try await synchronizeCloud()
+            startPendingUploads()
+            await syncTask?.value
+            if syncMessage != nil && conflictingAccountID == nil {
+                throw OTPStoreError.syncIncomplete
+            }
         } else {
-            let localEncrypted = try await LocalEncryptedStore.shared.fetchAll()
-            try await installLocalAccounts(localEncrypted)
+            let localEncrypted = try LocalEncryptedStore.shared.fetchAll()
+            try installLocalAccounts(localEncrypted)
         }
     }
 
@@ -157,7 +172,29 @@ final class OTPStore: ObservableObject {
 #else
             let remote = try await CloudKitManager.shared.fetchAll()
 #endif
-            return CloudFetchResult(accounts: remote, isAuthoritative: true)
+            // Queries may lag behind writes. Confirm missing or differing
+            // local records directly before installing the cloud snapshot.
+            var confirmed = Dictionary(uniqueKeysWithValues: remote.map { ($0.id, $0) })
+            try Task.checkCancellation()
+            let local = try LocalEncryptedStore.shared.fetchAll()
+            for item in local {
+                if let queried = confirmed[item.id],
+                   queried.cloudChangeTag == item.cloudChangeTag,
+                   queried.encryptedBlob == item.encryptedBlob { continue }
+                let record = try await CloudKitManager.shared.fetch(id: item.id)
+                try Task.checkCancellation()
+                if let record {
+                    confirmed[item.id] = record
+                } else {
+                    confirmed.removeValue(forKey: item.id)
+                    if item.cloudChangeTag != nil {
+                        deletedIDs.insert(item.id.uuidString)
+                        accounts.removeAll { $0.id == item.id }
+                    }
+                }
+            }
+            UserDefaults.standard.set(Array(deletedIDs), forKey: deletedIDsKey)
+            return CloudFetchResult(accounts: Array(confirmed.values), isAuthoritative: true)
         } catch CloudKitManagerError.recordTypeMissing {
             // CloudKit Development creates the record type on the first save.
             // An absent schema is not an authoritative empty vault: preserve
@@ -166,37 +203,37 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    private func saveEncryptedAccount(_ item: EncryptedOTPAccount) async throws {
-        try await LocalEncryptedStore.shared.save(item)
-
+    private func saveEncryptedAccount(_ item: EncryptedOTPAccount) throws {
+        try LocalEncryptedStore.shared.save(item)
         if isCloudSyncEnabled {
-            try await queueUpload(item)
-            syncMessage = String(localized: "Saved locally; syncing with iCloud…")
+            do {
+                try queueUpload(item)
+                syncMessage = String(localized: "Saved locally; syncing with iCloud…")
+            } catch {
+                // needsUpload is in the vault itself, so a failed queue write
+                // cannot lose the durable local change or its retry intent.
+                syncMessage = String(localized: "Your data is available on this device, but iCloud has not synced yet. Tap to retry.")
+            }
         }
     }
 
-    private func updateEncryptedAccount(_ item: EncryptedOTPAccount) async throws {
-        try await LocalEncryptedStore.shared.save(item)
-
-        if isCloudSyncEnabled {
-            try await queueUpload(item)
-            syncMessage = String(localized: "Saved locally; syncing with iCloud…")
-        }
+    private func updateEncryptedAccount(_ item: EncryptedOTPAccount) throws {
+        try saveEncryptedAccount(item)
     }
 
-    private func deleteEncryptedAccount(id: UUID) async throws {
-        try await LocalEncryptedStore.shared.delete(id: id)
+    private func deleteEncryptedAccount(id: UUID) throws {
+        try LocalEncryptedStore.shared.delete(id: id)
 
         if isCloudSyncEnabled {
             let owner = cloudOwner ?? PendingCloudUploads.unassignedOwner
-            try await PendingCloudUploads.shared.remove(id: id, owner: owner)
-            try await PendingCloudDeletes.shared.add(id: id, owner: owner)
+            try PendingCloudUploads.shared.remove(id: id, owner: owner)
+            try PendingCloudDeletes.shared.add(id: id, owner: owner)
         }
     }
 
     private func replaceAccounts(
         with encrypted: [EncryptedOTPAccount]
-    ) async throws {
+    ) throws {
         var decoded: [DecryptedAccount] = []
         decoded.reserveCapacity(encrypted.count)
 
@@ -217,120 +254,28 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    private func decryptRecord(
-        for item: EncryptedOTPAccount
-    ) throws -> EncryptedOTPRecordPayload {
-        guard let key = masterKeys[item.keyVersion] else {
-            throw OTPStoreError.masterKeyUnavailable
-        }
-
-        do {
-            switch item.version {
-            case 4:
-                return try CryptoManager.decrypt(
-                    EncryptedOTPRecordPayload.self,
-                    from: item.encryptedBlob,
-                    using: key,
-                    associatedData: CryptoManager.associatedData(
-                        for: item.id,
-                        version: item.version,
-                        keyVersion: item.keyVersion
-                    )
-                )
-            case 3:
-                let payload = try CryptoManager.decrypt(
-                    OTPAccountPayload.self,
-                    from: item.encryptedBlob,
-                    using: key,
-                    associatedData: CryptoManager.associatedData(
-                        for: item.id,
-                        version: item.version,
-                        keyVersion: item.keyVersion
-                    )
-                )
-                return EncryptedOTPRecordPayload(
-                    otp: payload,
-                    createdAt: item.createdAt,
-                    updatedAt: item.updatedAt
-                )
-            case 2:
-                let payload = try CryptoManager.decrypt(
-                    OTPAccountPayload.self,
-                    from: item.encryptedBlob,
-                    using: key,
-                    associatedData: CryptoManager.legacyAssociatedData(
-                        for: item.id,
-                        version: item.version
-                    )
-                )
-                return EncryptedOTPRecordPayload(
-                    otp: payload,
-                    createdAt: item.createdAt,
-                    updatedAt: item.updatedAt
-                )
-            case 1:
-                let payload: OTPAccountPayload
-                do {
-                    payload = try CryptoManager.decrypt(
-                        OTPAccountPayload.self,
-                        from: item.encryptedBlob,
-                        using: key,
-                        associatedData: CryptoManager.legacyAssociatedData(
-                            for: item.id,
-                            version: item.version
-                        )
-                    )
-                } catch {
-                    payload = try CryptoManager.decryptLegacy(
-                        OTPAccountPayload.self,
-                        from: item.encryptedBlob,
-                        using: key
-                    )
-                }
-                return EncryptedOTPRecordPayload(
-                    otp: payload,
-                    createdAt: item.createdAt,
-                    updatedAt: item.updatedAt
-                )
-            default:
-                throw OTPStoreError.undecryptableRecord
-            }
-        } catch let error as OTPStoreError {
-            throw error
-        } catch {
-            throw OTPStoreError.undecryptableRecord
-        }
+    private func decryptRecord(for item: EncryptedOTPAccount) throws -> EncryptedOTPRecordPayload {
+        guard let key = masterKeys[item.keyVersion] else { throw OTPStoreError.masterKeyUnavailable }
+        do { return try OTPRecordCodec.decrypt(item, using: key) }
+        catch { throw OTPStoreError.undecryptableRecord }
     }
 
     private func encryptRecord(
         _ record: EncryptedOTPRecordPayload,
         for id: UUID,
         using key: SymmetricKey,
-        keyVersion: Int
+        keyVersion: Int,
+        cloudChangeTag: String? = nil,
+        canCreateCloudRecord: Bool = true
     ) throws -> EncryptedOTPAccount {
-        let version = EncryptedOTPAccount.currentVersion
-        let encryptedBlob = try CryptoManager.encrypt(
-            record,
-            using: key,
-            associatedData: CryptoManager.associatedData(
-                for: id,
-                version: version,
-                keyVersion: keyVersion
-            )
-        )
-        return EncryptedOTPAccount(
-            id: id,
-            encryptedBlob: encryptedBlob,
-            version: version,
-            keyVersion: keyVersion,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt
-        )
+        try OTPRecordCodec.encrypt(record, for: id, using: key,
+                                   keyVersion: keyVersion, cloudChangeTag: cloudChangeTag,
+                                   canCreateCloudRecord: canCreateCloudRecord)
     }
 
     private func removeExactDuplicates(
         from encrypted: [EncryptedOTPAccount]
-    ) async throws -> [EncryptedOTPAccount] {
+    ) throws -> [EncryptedOTPAccount] {
         var decoded: [(item: EncryptedOTPAccount, record: EncryptedOTPRecordPayload)] = []
         decoded.reserveCapacity(encrypted.count)
 
@@ -357,7 +302,7 @@ final class OTPStore: ObservableObject {
             guard seenAccounts.insert(record.otp.identity).inserted else {
                 // Keep the oldest copy and remove later records for the same
                 // OTP credential, even if their display names differ.
-                try await deleteEncryptedAccount(id: item.id)
+                try deleteEncryptedAccount(id: item.id)
                 continue
             }
             unique.append(item)
@@ -407,7 +352,7 @@ final class OTPStore: ObservableObject {
                 keyVersion: keyVersion
             )
 
-            try await saveEncryptedAccount(item)
+            try saveEncryptedAccount(item)
             publishSavedAccount(item, record: protectedPayload)
             startPendingUploads()
             return true
@@ -418,11 +363,12 @@ final class OTPStore: ObservableObject {
     }
 
     @discardableResult
-    func updateDisplayName(for id: UUID, to rawName: String) async -> Bool {
+    func updateDisplayName(for id: UUID, to rawName: String, groupName rawGroup: String? = nil) async -> Bool {
         lastError = nil
 
         do {
             guard let masterKey,
+                  !deletedIDs.contains(id.uuidString),
                   let account = accounts.first(where: { $0.id == id })
             else {
                 throw OTPStoreError.accountNotFound
@@ -438,8 +384,10 @@ final class OTPStore: ObservableObject {
                 algorithm: account.payload.algorithm,
                 digits: account.payload.digits,
                 period: account.payload.period,
-                displayName: displayName.isEmpty ? nil : displayName
+                displayName: displayName.isEmpty ? nil : displayName,
+                groupName: rawGroup.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? account.payload.groupName
             )
+            let previous = try LocalEncryptedStore.shared.fetchAll().first { $0.id == id }
             let keyVersion = currentKeyVersion
             let protectedPayload = EncryptedOTPRecordPayload(
                 otp: payload,
@@ -450,10 +398,12 @@ final class OTPStore: ObservableObject {
                 protectedPayload,
                 for: id,
                 using: masterKey,
-                keyVersion: keyVersion
+                keyVersion: keyVersion,
+                cloudChangeTag: previous?.cloudChangeTag,
+                canCreateCloudRecord: previous?.canCreateCloudRecord ?? false
             )
 
-            try await updateEncryptedAccount(item)
+            try updateEncryptedAccount(item)
             publishSavedAccount(item, record: protectedPayload)
             startPendingUploads()
             return true
@@ -473,13 +423,15 @@ final class OTPStore: ObservableObject {
         lastError = nil
 
         do {
+            guard isReady, masterKey != nil else { throw OTPStoreError.masterKeyUnavailable }
             // Remove locally first. The cloud delete is queued and retried in
             // the background, so a network outage cannot block the vault.
             for id in ids {
-                try await deleteEncryptedAccount(id: id)
+                try deleteEncryptedAccount(id: id)
                 deletedIDs.insert(id.uuidString)
                 UserDefaults.standard.set(Array(deletedIDs), forKey: deletedIDsKey)
                 accounts.removeAll { $0.id == id }
+                if conflictingAccountID == id { conflictingAccountID = nil }
             }
             startPendingUploads()
             return true
@@ -489,10 +441,44 @@ final class OTPStore: ObservableObject {
         }
     }
 
+    func exportVault() throws -> VaultTransferManager.Export {
+        guard isReady, masterKey != nil else { throw OTPStoreError.masterKeyUnavailable }
+        return try VaultTransferManager.export(accounts: accounts.map(\.payload))
+    }
+
+    func importVault(data: Data, backupKey: String) throws -> Int {
+        guard isReady, let masterKey else { throw OTPStoreError.masterKeyUnavailable }
+        let imported = try VaultTransferManager.open(data: data, key: backupKey)
+        var identities = Set(accounts.map { $0.payload.identity })
+        var additions: [EncryptedOTPAccount] = []
+        for payload in imported where identities.insert(payload.identity).inserted {
+            let now = Date()
+            additions.append(try encryptRecord(
+                EncryptedOTPRecordPayload(otp: payload, createdAt: now, updatedAt: now),
+                for: UUID(), using: masterKey, keyVersion: currentKeyVersion
+            ))
+        }
+        guard !additions.isEmpty else { return 0 }
+        let existing = try LocalEncryptedStore.shared.fetchAll()
+        let merged = existing + additions
+        try LocalEncryptedStore.shared.replaceAll(merged)
+        try replaceAccounts(with: merged)
+        if isCloudSyncEnabled {
+            let owner = cloudOwner ?? PendingCloudUploads.unassignedOwner
+            do { try PendingCloudUploads.shared.save(additions, owner: owner) }
+            catch {
+                syncMessage = String(localized: "Your data is available on this device, but iCloud has not synced yet. Tap to retry.")
+            }
+            startPendingUploads()
+        }
+        return additions.count
+    }
+
     @discardableResult
     func enableRecovery() async -> String? {
         lastError = nil
 
+        let session = vaultSessionID
         guard !recoveryEnabled else {
             lastError = String(
                 localized: "Recovery feature is already enabled; this version does not support generating a new recovery key."
@@ -510,11 +496,14 @@ final class OTPStore: ObservableObject {
                 throw RecoveryError.alreadyEnabled
             }
 
+            guard vaultSessionID == session, isReady else { return nil }
+            UserDefaults.standard.set(false, forKey: "KeyAuth.RecoveryKeySaved")
             let result = try await RecoveryManager.shared.enableRecovery(
                 keys: masterKeys,
                 currentVersion: currentKeyVersion
             )
 
+            guard vaultSessionID == session, isReady else { return nil }
             recoveryKey = result.key
             recoveryEnabled = true
             return result.code
@@ -524,8 +513,25 @@ final class OTPStore: ObservableObject {
         }
     }
 
+    func pendingRecoveryCode() -> String? {
+        guard UserDefaults.standard.object(forKey: "KeyAuth.RecoveryKeySaved") != nil,
+              !UserDefaults.standard.bool(forKey: "KeyAuth.RecoveryKeySaved"),
+              let recoveryKey else { return nil }
+        let encoded = recoveryKey.withUnsafeBytes { Data($0) }
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return "KA1-\(encoded)"
+    }
+
+    func confirmRecoveryKeySaved() {
+        UserDefaults.standard.set(true, forKey: "KeyAuth.RecoveryKeySaved")
+    }
+
     @discardableResult
     func rotateMasterKey(context: LAContext) async -> Bool {
+        let session = vaultSessionID
         lastError = nil
 
         do {
@@ -537,7 +543,8 @@ final class OTPStore: ObservableObject {
             // This prevents two devices from independently creating the same
             // version number from stale state.
             if isCloudSyncEnabled {
-                try await synchronizeCloud()
+                try await refresh()
+                guard conflictingAccountID == nil else { throw OTPStoreError.syncIncomplete }
             }
 
             try await refreshRecoveryKeyringIfNeeded()
@@ -545,6 +552,7 @@ final class OTPStore: ObservableObject {
             let (newVersion, newKey) = try await KeychainManager.shared
                 .createNextMasterKey(context: context)
 
+            guard vaultSessionID == session, isReady else { throw CancellationError() }
             var rotationKeyring = masterKeys
             rotationKeyring[newVersion] = newKey
 
@@ -561,7 +569,8 @@ final class OTPStore: ObservableObject {
                 throw RecoveryError.recoveryKeyUnavailable
             }
 
-            let encrypted = try await LocalEncryptedStore.shared.fetchAll()
+            guard vaultSessionID == session, isReady else { throw CancellationError() }
+            let encrypted = try LocalEncryptedStore.shared.fetchAll()
             var rotated: [EncryptedOTPAccount] = []
             rotated.reserveCapacity(encrypted.count)
 
@@ -571,25 +580,28 @@ final class OTPStore: ObservableObject {
                     record,
                     for: item.id,
                     using: newKey,
-                    keyVersion: newVersion
+                    keyVersion: newVersion,
+                    cloudChangeTag: item.cloudChangeTag,
+                    canCreateCloudRecord: item.canCreateCloudRecord
                 )
                 rotated.append(rotatedItem)
             }
 
             // Replace the local vault before making the new version current.
-            try await LocalEncryptedStore.shared.replaceAll(rotated)
+            try LocalEncryptedStore.shared.replaceAll(rotated)
 
             // Keep both keys available while queued uploads are sent.
             masterKeys[newVersion] = newKey
 
             for item in rotated {
-                try await queueUpload(item)
+                try queueUpload(item)
             }
 
             currentKeyVersion = newVersion
             await KeychainManager.shared.commitRotation(version: newVersion)
 
-            try await replaceAccounts(with: rotated)
+            guard vaultSessionID == session, isReady else { throw CancellationError() }
+            try replaceAccounts(with: LocalEncryptedStore.shared.fetchAll())
             startPendingUploads()
             return true
         } catch {
@@ -604,7 +616,7 @@ final class OTPStore: ObservableObject {
 
     private func installLocalAccounts(
         _ encrypted: [EncryptedOTPAccount]
-    ) async throws {
+    ) throws {
         guard let currentKey = masterKey else {
             throw OTPStoreError.masterKeyUnavailable
         }
@@ -628,22 +640,24 @@ final class OTPStore: ObservableObject {
                 record,
                 for: item.id,
                 using: currentKey,
-                keyVersion: currentKeyVersion
+                keyVersion: currentKeyVersion,
+                cloudChangeTag: item.cloudChangeTag,
+                    canCreateCloudRecord: item.canCreateCloudRecord
             )
             current.append(migrated)
             if isCloudSyncEnabled {
-                try await queueUpload(migrated)
+                try queueUpload(migrated)
             }
         }
 
-        try await LocalEncryptedStore.shared.replaceAll(current)
-        try await replaceAccounts(with: current)
+        try LocalEncryptedStore.shared.replaceAll(current)
+        try replaceAccounts(with: current)
     }
 
-    private func queueUpload(_ item: EncryptedOTPAccount) async throws {
+    private func queueUpload(_ item: EncryptedOTPAccount) throws {
         let owner = cloudOwner ?? PendingCloudUploads.unassignedOwner
-        try await PendingCloudDeletes.shared.remove(id: item.id, owner: owner)
-        try await PendingCloudUploads.shared.save(item, owner: owner)
+        try PendingCloudDeletes.shared.remove(id: item.id, owner: owner)
+        try PendingCloudUploads.shared.save(item, owner: owner)
     }
 
     private func connectToCloud() async throws -> CloudFetchResult {
@@ -661,14 +675,15 @@ final class OTPStore: ObservableObject {
             throw OTPStoreError.cloudAccountUnavailable
         }
 
+        try Task.checkCancellation()
         cloudOwner = owner
         UserDefaults.standard.set(owner, forKey: cloudOwnerKey)
 
-        try await PendingCloudUploads.shared.move(
+        try PendingCloudUploads.shared.move(
             from: PendingCloudUploads.unassignedOwner,
             to: owner
         )
-        try await PendingCloudDeletes.shared.move(
+        try PendingCloudDeletes.shared.move(
             from: PendingCloudUploads.unassignedOwner,
             to: owner
         )
@@ -686,12 +701,16 @@ final class OTPStore: ObservableObject {
                 recoveryKey: recoveryKey
             )
 
+            try Task.checkCancellation()
+            guard isReady, masterKey != nil else { throw CancellationError() }
             if snapshot.currentVersion > currentKeyVersion {
                 try await KeychainManager.shared.installRecoveredKeyring(
                     snapshot.keyData,
                     currentVersion: snapshot.currentVersion
                 )
 
+                try Task.checkCancellation()
+                guard isReady, masterKey != nil else { throw CancellationError() }
                 for (version, data) in snapshot.keyData {
                     masterKeys[version] = SymmetricKey(data: data)
                 }
@@ -707,6 +726,8 @@ final class OTPStore: ObservableObject {
                 )
             }
         } catch RecoveryError.envelopeMissing {
+            try Task.checkCancellation()
+            guard isReady, masterKey != nil else { throw CancellationError() }
             // A local Recovery Key without an envelope can safely recreate it
             // from the current in-memory key ring.
             try await RecoveryManager.shared.updateEnvelope(
@@ -717,12 +738,12 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    private func upgradePendingUploads(owner: String) async throws {
+    private func upgradePendingUploads(owner: String) throws {
         guard let currentKey = masterKey else {
             throw OTPStoreError.masterKeyUnavailable
         }
 
-        let pending = try await PendingCloudUploads.shared.fetch(owner: owner)
+        let pending = try PendingCloudUploads.shared.fetch(owner: owner)
 
         for item in pending where
             item.version != EncryptedOTPAccount.currentVersion ||
@@ -732,14 +753,16 @@ final class OTPStore: ObservableObject {
                 record,
                 for: item.id,
                 using: currentKey,
-                keyVersion: currentKeyVersion
+                keyVersion: currentKeyVersion,
+                cloudChangeTag: item.cloudChangeTag,
+                    canCreateCloudRecord: item.canCreateCloudRecord
             )
 
-            try await PendingCloudUploads.shared.save(
+            try PendingCloudUploads.shared.save(
                 migrated,
                 owner: owner
             )
-            try await LocalEncryptedStore.shared.save(migrated)
+            try LocalEncryptedStore.shared.save(migrated)
         }
     }
 
@@ -747,19 +770,35 @@ final class OTPStore: ObservableObject {
         try await refreshRecoveryKeyringIfNeeded()
 
         let initialCloud = try await connectToCloud()
+        try Task.checkCancellation()
         guard let owner = cloudOwner else {
             throw OTPStoreError.cloudAccountUnavailable
         }
 
         syncMessage = String(localized: "Syncing with iCloud…")
-        try await upgradePendingUploads(owner: owner)
+        for item in try LocalEncryptedStore.shared.fetchAll()
+            where item.needsUpload && !deletedIDs.contains(item.id.uuidString) {
+            try queueUpload(item)
+        }
+        let remoteIDs = Set(initialCloud.accounts.map(\.id))
+        if initialCloud.isAuthoritative,
+           let legacy = try LocalEncryptedStore.shared.fetchAll().first(where: {
+               $0.cloudChangeTag == nil && !$0.canCreateCloudRecord &&
+               !remoteIDs.contains($0.id) && !deletedIDs.contains($0.id.uuidString)
+           }) {
+            conflictingAccountID = legacy.id
+            conflictRemoteMissing = true
+            throw CloudKitManagerError.accountChanged(legacy.id)
+        }
+        try upgradePendingUploads(owner: owner)
         try await flushPendingChanges(owner: owner)
 
         let latestCloud = try await fetchRemoteAccounts()
-        let local = try await LocalEncryptedStore.shared.fetchAll()
-        let remainingUploads = try await PendingCloudUploads.shared.fetch(owner: owner)
+        try Task.checkCancellation()
+        let local = try LocalEncryptedStore.shared.fetchAll()
+        let remainingUploads = try PendingCloudUploads.shared.fetch(owner: owner)
         let remainingDeletes = Set(
-            try await PendingCloudDeletes.shared.fetch(owner: owner)
+            try PendingCloudDeletes.shared.fetch(owner: owner)
         )
         let merged = merge(
             local: local,
@@ -768,18 +807,19 @@ final class OTPStore: ObservableObject {
             pendingUploads: remainingUploads,
             pendingDeletes: remainingDeletes
         )
-        let uniqueMerged = try await removeExactDuplicates(from: merged)
-        try await installLocalAccounts(uniqueMerged)
+        let uniqueMerged = try removeExactDuplicates(from: merged)
+        try installLocalAccounts(uniqueMerged)
 
         // Duplicate cleanup and changes made while the first sync was in
         // flight may have added more queued work. Flush once more, then use
         // the resulting cloud view as the final local snapshot.
         try await flushPendingChanges(owner: owner)
         let finalCloud = try await fetchRemoteAccounts()
-        let finalLocal = try await LocalEncryptedStore.shared.fetchAll()
-        let finalUploads = try await PendingCloudUploads.shared.fetch(owner: owner)
+        try Task.checkCancellation()
+        let finalLocal = try LocalEncryptedStore.shared.fetchAll()
+        let finalUploads = try PendingCloudUploads.shared.fetch(owner: owner)
         let finalDeletes = Set(
-            try await PendingCloudDeletes.shared.fetch(owner: owner)
+            try PendingCloudDeletes.shared.fetch(owner: owner)
         )
         let finalMerged = merge(
             local: finalLocal,
@@ -788,7 +828,7 @@ final class OTPStore: ObservableObject {
             pendingUploads: finalUploads,
             pendingDeletes: finalDeletes
         )
-        try await installLocalAccounts(finalMerged)
+        try installLocalAccounts(finalMerged)
 
         try await cleanupOldMasterKeysIfSafe(
             local: finalMerged,
@@ -859,12 +899,14 @@ final class OTPStore: ObservableObject {
             return
         }
 
+        try Task.checkCancellation()
         let versions = await KeychainManager.shared.knownKeyVersions()
         let obsoleteVersions = versions.filter {
             $0 < currentKeyVersion
         }
 
         for version in obsoleteVersions {
+            try Task.checkCancellation()
             try await KeychainManager.shared
                 .deleteMasterKey(version: version)
             masterKeys.removeValue(forKey: version)
@@ -873,20 +915,55 @@ final class OTPStore: ObservableObject {
 
     private func flushPendingChanges(owner: String) async throws {
         while true {
-            let pendingUploads = try await PendingCloudUploads.shared.fetch(owner: owner)
-            let pendingDeletes = try await PendingCloudDeletes.shared.fetch(owner: owner)
+            let pendingUploads = try PendingCloudUploads.shared.fetch(owner: owner)
+            let pendingDeletes = try PendingCloudDeletes.shared.fetch(owner: owner)
             guard !pendingUploads.isEmpty || !pendingDeletes.isEmpty else { break }
 
             let deleted = Set(pendingDeletes)
             for id in pendingDeletes {
                 try await CloudKitManager.shared.delete(id: id)
-                try await PendingCloudDeletes.shared.remove(id: id, owner: owner)
-                try await PendingCloudUploads.shared.remove(id: id, owner: owner)
+                try Task.checkCancellation()
+                try PendingCloudDeletes.shared.remove(id: id, owner: owner)
+                try PendingCloudUploads.shared.remove(id: id, owner: owner)
             }
 
             for item in pendingUploads where !deleted.contains(item.id) {
-                try await CloudKitManager.shared.upsert(item)
-                try await PendingCloudUploads.shared.remove(id: item.id, owner: owner)
+                try Task.checkCancellation()
+                if deletedIDs.contains(item.id.uuidString) {
+                    try PendingCloudUploads.shared.remove(id: item.id, owner: owner)
+                    try LocalEncryptedStore.shared.delete(id: item.id)
+                    continue
+                }
+                guard try PendingCloudUploads.shared.fetch(owner: owner).contains(where: {
+                          $0.id == item.id && $0.encryptedBlob == item.encryptedBlob
+                      }) else { continue }
+                do {
+                    let saved = try await CloudKitManager.shared.upsert(item)
+                    try Task.checkCancellation()
+                    if let saved {
+                        try LocalEncryptedStore.shared.acknowledge(item, saved: saved)
+                        try PendingCloudUploads.shared.acknowledge(item, saved: saved, owner: owner)
+                    } else {
+                        try LocalEncryptedStore.shared.delete(id: item.id)
+                        deletedIDs.insert(item.id.uuidString)
+                        accounts.removeAll { $0.id == item.id }
+                        UserDefaults.standard.set(Array(deletedIDs), forKey: deletedIDsKey)
+                        try PendingCloudUploads.shared.remove(id: item.id, owner: owner)
+                    }
+                } catch CloudKitManagerError.accountMissing(let id) {
+                    try Task.checkCancellation()
+                    if deletedIDs.contains(id.uuidString) { continue }
+                    conflictingAccountID = id
+                    conflictRemoteMissing = true
+                    throw CloudKitManagerError.accountMissing(id)
+                } catch CloudKitManagerError.accountChanged(let id) {
+                    try Task.checkCancellation()
+                    // Deletion on this device wins over a stale upload response.
+                    if deletedIDs.contains(id.uuidString) { continue }
+                    conflictingAccountID = id
+                    conflictRemoteMissing = false
+                    throw CloudKitManagerError.accountChanged(id)
+                }
             }
         }
     }
@@ -910,7 +987,7 @@ final class OTPStore: ObservableObject {
 
             if let pending = pendingByID[item.id] {
                 merged[item.id] = pending
-            } else if !remoteIsAuthoritative || merged[item.id] == nil {
+            } else if !remoteIsAuthoritative || (merged[item.id] == nil && item.cloudChangeTag == nil) {
                 // Local data is the primary vault. Keep records that have not
                 // reached CloudKit yet, including while the schema is absent.
                 merged[item.id] = item
@@ -923,31 +1000,76 @@ final class OTPStore: ObservableObject {
         }
     }
 
+    func resolveConflict(keepLocal: Bool) async {
+        guard let id = conflictingAccountID, let owner = cloudOwner,
+              isReady, !isResolvingConflict else { return }
+        isResolvingConflict = true
+        lastError = nil
+        defer { isResolvingConflict = false }
+        do {
+            let session = vaultSessionID
+            let expected = try LocalEncryptedStore.shared.fetchAll().first { $0.id == id }
+            let remote = try await CloudKitManager.shared.fetch(id: id)
+            guard vaultSessionID == session, isReady, masterKey != nil,
+                  let current = try LocalEncryptedStore.shared.fetchAll().first(where: { $0.id == id }),
+                  current.encryptedBlob == expected?.encryptedBlob else { return }
+            if keepLocal {
+                var local = current
+                local.cloudChangeTag = remote?.cloudChangeTag
+                local.canCreateCloudRecord = remote == nil
+                local.needsUpload = true
+                deletedIDs.remove(id.uuidString)
+                try PendingCloudUploads.shared.save(local, owner: owner)
+                try LocalEncryptedStore.shared.save(local)
+            } else {
+                if let remote {
+                    _ = try decryptRecord(for: remote)
+                    try LocalEncryptedStore.shared.save(remote)
+                } else {
+                    try LocalEncryptedStore.shared.delete(id: id)
+                    deletedIDs.insert(id.uuidString)
+                }
+                try PendingCloudUploads.shared.remove(id: id, owner: owner)
+            }
+            UserDefaults.standard.set(Array(deletedIDs), forKey: deletedIDsKey)
+            conflictingAccountID = nil
+            conflictRemoteMissing = false
+            try replaceAccounts(with: LocalEncryptedStore.shared.fetchAll())
+            startPendingUploads()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     func startPendingUploads() {
-        guard isCloudSyncEnabled, isReady, masterKey != nil else { return }
+        guard isCloudSyncEnabled, isReady, masterKey != nil,
+              conflictingAccountID == nil else { return }
         if syncTask != nil {
             syncRequested = true
             return
         }
 
+        let id = UUID()
+        syncID = id
         syncTask = Task {
             var failed = false
             do {
                 try await synchronizeCloud()
+            } catch is CancellationError {
+                return
             } catch {
+                guard syncID == id else { return }
                 failed = true
-                // The local vault stays ready and usable. This status is
-                // intentionally non-blocking and can be retried by the user.
                 syncMessage = String(
                     localized: "Your data is available on this device, but iCloud has not synced yet. Tap to retry."
                 )
             }
+            guard syncID == id else { return }
+            syncID = nil
             syncTask = nil
             if syncRequested {
                 syncRequested = false
-                if !failed {
-                    startPendingUploads()
-                }
+                if !failed { startPendingUploads() }
             }
         }
     }

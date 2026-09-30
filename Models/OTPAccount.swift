@@ -23,6 +23,7 @@ struct OTPAccountPayload: Codable, Sendable, Hashable {
     let digits: Int
     let period: Int
     let displayName: String?
+    let groupName: String?
 
     init(
         issuer: String,
@@ -31,7 +32,8 @@ struct OTPAccountPayload: Codable, Sendable, Hashable {
         algorithm: OTPAlgorithm,
         digits: Int,
         period: Int,
-        displayName: String? = nil
+        displayName: String? = nil,
+        groupName: String? = nil
     ) {
         self.issuer = issuer
         self.accountName = accountName
@@ -40,6 +42,7 @@ struct OTPAccountPayload: Codable, Sendable, Hashable {
         self.digits = digits
         self.period = period
         self.displayName = displayName
+        self.groupName = groupName
     }
 
     var identity: OTPAccountIdentity {
@@ -83,6 +86,9 @@ struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
     var encryptedBlob: Data
     var version: Int
     var keyVersion: Int
+    var cloudChangeTag: String?
+    var needsUpload: Bool
+    var canCreateCloudRecord: Bool
     // Plaintext copies are CloudKit query/sort hints. Version 4 authenticates
     // the canonical timestamps inside encryptedBlob.
     var createdAt: Date
@@ -93,6 +99,9 @@ struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
         encryptedBlob: Data,
         version: Int = EncryptedOTPAccount.currentVersion,
         keyVersion: Int = 1,
+        cloudChangeTag: String? = nil,
+        needsUpload: Bool = false,
+        canCreateCloudRecord: Bool = false,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -100,12 +109,15 @@ struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
         self.encryptedBlob = encryptedBlob
         self.version = version
         self.keyVersion = keyVersion
+        self.cloudChangeTag = cloudChangeTag
+        self.needsUpload = needsUpload
+        self.canCreateCloudRecord = canCreateCloudRecord
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, encryptedBlob, version, keyVersion, createdAt, updatedAt
+        case id, encryptedBlob, version, keyVersion, cloudChangeTag, needsUpload, canCreateCloudRecord, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -119,6 +131,9 @@ struct EncryptedOTPAccount: Identifiable, Codable, Hashable, Sendable {
             Int.self,
             forKey: .keyVersion
         ) ?? 1
+        cloudChangeTag = try container.decodeIfPresent(String.self, forKey: .cloudChangeTag)
+        needsUpload = try container.decodeIfPresent(Bool.self, forKey: .needsUpload) ?? false
+        canCreateCloudRecord = try container.decodeIfPresent(Bool.self, forKey: .canCreateCloudRecord) ?? false
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }

@@ -119,6 +119,29 @@
         }
       }
     },
+    "A secure backup key could not be generated." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A secure backup key could not be generated."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法生成安全的备份密钥。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法產生安全的備份密鑰。"
+          }
+        }
+      }
+    },
     "Account" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -475,6 +498,51 @@
         }
       }
     },
+    "All accounts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All accounts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有帳號"
+          }
+        }
+      }
+    },
+    "Backup and import" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup and import"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份与导入"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份與匯入"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -594,6 +662,29 @@
         }
       }
     },
+    "Choose encrypted file" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose encrypted file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择加密文件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇加密檔案"
+          }
+        }
+      }
+    },
     "Clear the field to use the name from the QR code." : {
       "localizations" : {
         "ar" : {
@@ -708,6 +799,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除此欄位即可使用 QR Code 中的名稱。"
+          }
+        }
+      }
+    },
+    "Copied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已复制"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已複製"
+          }
+        }
+      }
+    },
+    "Copy verification code" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy verification code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制验证码"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複製驗證碼"
+          }
+        }
+      }
+    },
+    "Create encrypted backup" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create encrypted backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建加密备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建立加密備份"
           }
         }
       }
@@ -950,7 +1109,30 @@
         }
       }
     },
+    "Deleting removes the account from this device immediately and deletes the cloud record after iCloud reconnects. An older exported backup may still contain it." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleting removes the account from this device immediately and deletes the cloud record after iCloud reconnects. An older exported backup may still contain it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除会立即从本机移除此账户，并在 iCloud 恢复连接后删除云端记录。较早导出的备份可能仍包含它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除會立即從此裝置移除此帳號，並在 iCloud 恢復連線後刪除雲端記錄。較早匯出的備份可能仍包含它。"
+          }
+        }
+      }
+    },
     "Deleting removes the account from this device immediately and deletes the cloud record after iCloud reconnects. It cannot be recovered after sync completes." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1663,6 +1845,75 @@
         }
       }
     },
+    "Encrypted backup and import" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted backup and import"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加密备份与导入"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加密備份與匯入"
+          }
+        }
+      }
+    },
+    "Encrypted backup saved." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted backup saved."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存加密备份。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已儲存加密備份。"
+          }
+        }
+      }
+    },
+    "Enter the backup key saved when this file was exported." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the backup key saved when this file was exported."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入导出此文件时保存的备份密钥。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請輸入匯出此檔案時保存的備份密鑰。"
+          }
+        }
+      }
+    },
     "Error" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1778,6 +2029,166 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "錯誤"
+          }
+        }
+      }
+    },
+    "Existing accounts are kept. Duplicate credentials are skipped." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing accounts are kept. Duplicate credentials are skipped."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留现有账户，跳过重复凭据。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留現有帳號，略過重複憑證。"
+          }
+        }
+      }
+    },
+    "Export encrypted backup" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export encrypted backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出加密备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出加密備份"
+          }
+        }
+      }
+    },
+    "Group" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Group"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分组"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "群組"
+          }
+        }
+      }
+    },
+    "Group name" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Group name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分组名称"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "群組名稱"
+          }
+        }
+      }
+    },
+    "Groups and backup" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Groups and backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分组与备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "群組與備份"
+          }
+        }
+      }
+    },
+    "I saved my recovery key in a safe place" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I saved my recovery key in a safe place"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已将恢复密钥保存在安全的地方"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已將復原密鑰保存在安全的地方"
+          }
+        }
+      }
+    },
+    "I saved the backup key separately" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I saved the backup key separately"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已单独保存备份密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已另外保存備份密鑰"
           }
         }
       }
@@ -2018,6 +2429,52 @@
         }
       }
     },
+    "Import encrypted backup" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import encrypted backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入加密备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯入加密備份"
+          }
+        }
+      }
+    },
+    "Imported accounts:" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported accounts:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已导入账户："
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已匯入帳號："
+          }
+        }
+      }
+    },
     "Issuer" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2252,6 +2709,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "KA1-復原金鑰"
+          }
+        }
+      }
+    },
+    "KAB1-Backup key" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KAB1-Backup key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KAB1-备份密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KAB1-備份密鑰"
+          }
+        }
+      }
+    },
+    "Keep this device's version" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep this device's version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留本机版本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留此裝置的版本"
           }
         }
       }
@@ -4276,6 +4779,29 @@
         }
       }
     },
+    "Save encrypted file" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save encrypted file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存加密文件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存加密檔案"
+          }
+        }
+      }
+    },
     "Saved locally; syncing with iCloud…" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4514,6 +5040,52 @@
         }
       }
     },
+    "Search accounts" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search accounts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋帳號"
+          }
+        }
+      }
+    },
+    "Sync conflict" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync conflict"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步冲突"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步衝突"
+          }
+        }
+      }
+    },
     "Syncing with iCloud…" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4629,6 +5201,163 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在同步 iCloud…"
+          }
+        }
+      }
+    },
+    "The backup contains all accounts and groups. Save its backup key separately; the recovery key cannot open this file." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The backup contains all accounts and groups. Save its backup key separately; the recovery key cannot open this file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份包含全部账户和分组。请单独保存备份密钥；恢复密钥无法打开此文件。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份包含所有帳號和群組。請另外保存備份密鑰；復原密鑰無法開啟此檔案。"
+          }
+        }
+      }
+    },
+    "The backup could not be opened. Check the file and backup key." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The backup could not be opened. Check the file and backup key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开备份。请检查文件和备份密钥。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法開啟備份。請檢查檔案和備份密鑰。"
+          }
+        }
+      }
+    },
+    "This account changed on another device. Choose which version to keep." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This account changed on another device. Choose which version to keep."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此账户已在另一台设备上更改。请选择要保留的版本。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此帳號已在另一部裝置上更改。請選擇要保留的版本。"
+          }
+        }
+      }
+    },
+    "This account changed on another device. Your local change is saved until you choose which version to keep." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This account changed on another device. Your local change is saved until you choose which version to keep."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此账户已在另一台设备上更改。在你选择保留哪个版本之前，本机修改会保留。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此帳號已在另一部裝置上更改。在你選擇保留哪個版本之前，本機修改會保留。"
+          }
+        }
+      }
+    },
+    "This backup is too large to import." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This backup is too large to import."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此备份过大，无法导入。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此備份過大，無法匯入。"
+          }
+        }
+      }
+    },
+    "This older account is missing from iCloud. Keep this device's version to upload it again, or use iCloud's version to remove it from this device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This older account is missing from iCloud. Keep this device's version to upload it again, or use iCloud's version to remove it from this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此旧账户在 iCloud 中不存在。保留本机版本会重新上传；使用 iCloud 版本会从本机删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此舊帳號在 iCloud 中不存在。保留此裝置的版本會重新上傳；使用 iCloud 版本會從此裝置刪除。"
+          }
+        }
+      }
+    },
+    "Ungrouped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ungrouped"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未分组"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未分組"
           }
         }
       }
@@ -5346,7 +6075,31 @@
         }
       }
     },
+    "Use iCloud's version" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use iCloud's version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 iCloud 版本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 iCloud 版本"
+          }
+        }
+      }
+    },
     "View KeyAuth on the App Store" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

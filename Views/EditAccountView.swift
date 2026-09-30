@@ -8,9 +8,11 @@ struct EditAccountView: View {
 
     @State private var displayName: String
     @State private var isSaving = false
+    @State private var groupName: String
 
     init(account: OTPStore.DecryptedAccount) {
         self.account = account
+        _groupName = State(initialValue: account.payload.groupName ?? "")
         _displayName = State(
             initialValue: account.payload.displayName
                 ?? account.payload.displayTitle
@@ -28,6 +30,12 @@ struct EditAccountView: View {
                     Text("Clear the field to use the name from the QR code.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+
+                Section("Group") {
+                    TextField("Group name", text: $groupName)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
                 }
 
                 Section("Account") {
@@ -51,7 +59,8 @@ struct EditAccountView: View {
                         Task {
                             if await store.updateDisplayName(
                                 for: account.id,
-                                to: displayName
+                                to: displayName,
+                                groupName: groupName
                             ) {
                                 dismiss()
                             } else {

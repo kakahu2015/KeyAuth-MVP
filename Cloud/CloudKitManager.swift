@@ -6,6 +6,8 @@ enum CloudKitManagerError: LocalizedError {
     case recordTypeMissing(String)
     case recordFetchFailed
     case malformedRecord(String)
+    case accountChanged(UUID)
+    case accountMissing(UUID)
     case recoveryEnvelopeChanged
 
     var errorDescription: String? {
@@ -20,6 +22,8 @@ enum CloudKitManagerError: LocalizedError {
             return String(localized: "CloudKit returned a record that could not be read.")
         case .malformedRecord(let recordName):
             return String(localized: "CloudKit returned a malformed record.") + " (\(recordName))"
+        case .accountChanged, .accountMissing:
+            return String(localized: "This account changed on another device. Choose which version to keep.")
         case .recoveryEnvelopeChanged:
             return String(localized: "Recovery data changed on another device. Please try again.")
         }
@@ -59,34 +63,41 @@ actor CloudKitManager {
         return try await container.accountStatus()
     }
 
-    func save(_ item: EncryptedOTPAccount) async throws {
+    func fetch(id: UUID) async throws -> EncryptedOTPAccount? {
         let database = try configuredDatabase()
-        let recordID = CKRecord.ID(recordName: item.id.uuidString)
-        let record = CKRecord(recordType: recordType, recordID: recordID)
-
-        apply(item, to: record)
+        let recordID = CKRecord.ID(recordName: id.uuidString)
         do {
-            _ = try await database.save(record)
-        } catch let error as CKError where error.code == .serverRecordChanged {
-            // Retrying an upload whose response was lost must be idempotent.
-            let existing = try await database.record(for: recordID)
-            guard existing["blob"] as? Data == item.encryptedBlob else { throw error }
+            let record = try await database.record(for: recordID)
+            return try decode([(recordID, .success(record))]).first
+        } catch let error as CKError where error.code == .unknownItem {
+            return nil
         }
     }
 
-    func upsert(_ item: EncryptedOTPAccount) async throws {
+    func upsert(_ item: EncryptedOTPAccount) async throws -> EncryptedOTPAccount? {
         let database = try configuredDatabase()
         let recordID = CKRecord.ID(recordName: item.id.uuidString)
-
+        var record: CKRecord
         do {
-            // Local changes are authoritative on this device. Reuse the
-            // current server record so queued edits can be retried after an
-            // offline period without requiring a second network round trip.
-            let record = try await database.record(for: recordID)
-            apply(item, to: record)
-            _ = try await database.save(record)
+            record = try await database.record(for: recordID)
+            if record["blob"] as? Data == item.encryptedBlob {
+                return try decode([(recordID, .success(record))]).first
+            }
+            guard let tag = item.cloudChangeTag, tag == record.recordChangeTag else {
+                throw CloudKitManagerError.accountChanged(item.id)
+            }
         } catch let error as CKError where error.code == .unknownItem {
-            try await save(item)
+            // An acknowledged record that disappeared was deleted remotely.
+            guard item.cloudChangeTag == nil else { return nil }
+            guard item.canCreateCloudRecord else { throw CloudKitManagerError.accountMissing(item.id) }
+            record = CKRecord(recordType: recordType, recordID: recordID)
+        }
+        apply(item, to: record)
+        do {
+            let saved = try await database.save(record)
+            return try decode([(recordID, .success(saved))]).first
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            throw CloudKitManagerError.accountChanged(item.id)
         }
     }
 
@@ -271,6 +282,7 @@ actor CloudKitManager {
                 encryptedBlob: blob,
                 version: version,
                 keyVersion: keyVersion,
+                cloudChangeTag: record.recordChangeTag,
                 createdAt: createdAt,
                 updatedAt: updatedAt
             )

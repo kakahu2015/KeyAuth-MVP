@@ -1,6 +1,7 @@
 import Foundation
 
-actor LocalEncryptedStore {
+@MainActor
+final class LocalEncryptedStore {
     static let shared = LocalEncryptedStore()
 
     private let legacyStorageKey = "KeyAuth.LocalEncryptedAccounts.v1"
@@ -36,6 +37,20 @@ actor LocalEncryptedStore {
             items[index] = item
         } else {
             items.append(item)
+        }
+        try persist(items)
+    }
+
+    func acknowledge(_ original: EncryptedOTPAccount, saved: EncryptedOTPAccount) throws {
+        var items = try fetchAll()
+        guard let index = items.firstIndex(where: { $0.id == original.id }) else { return }
+        if items[index].encryptedBlob == original.encryptedBlob {
+            items[index] = saved
+        } else if items[index].cloudChangeTag == original.cloudChangeTag {
+            // A newer local edit keeps its ciphertext and adopts the revision
+            // produced by the upload on which that edit was based.
+            items[index].cloudChangeTag = saved.cloudChangeTag
+            items[index].canCreateCloudRecord = false
         }
         try persist(items)
     }
@@ -82,7 +97,8 @@ actor LocalEncryptedStore {
 
 // Durable encrypted changes are scoped to the current iCloud user once known;
 // a local queue is used until the account identity is available.
-actor PendingCloudUploads {
+@MainActor
+final class PendingCloudUploads {
     static let shared = PendingCloudUploads()
     static let unassignedOwner = "__local_pending__"
 
@@ -105,6 +121,24 @@ actor PendingCloudUploads {
     func save(_ item: EncryptedOTPAccount, owner: String) throws {
         var items = try fetch(owner: owner).filter { $0.id != item.id }
         items.append(item)
+        try write(items, owner: owner)
+    }
+
+    func save(_ additions: [EncryptedOTPAccount], owner: String) throws {
+        let ids = Set(additions.map(\.id))
+        let retained = try fetch(owner: owner).filter { !ids.contains($0.id) }
+        try write(retained + additions, owner: owner)
+    }
+
+    func acknowledge(_ original: EncryptedOTPAccount, saved: EncryptedOTPAccount, owner: String) throws {
+        var items = try fetch(owner: owner)
+        guard let index = items.firstIndex(where: { $0.id == original.id }) else { return }
+        if items[index].encryptedBlob == original.encryptedBlob {
+            items.remove(at: index)
+        } else if items[index].cloudChangeTag == original.cloudChangeTag {
+            items[index].cloudChangeTag = saved.cloudChangeTag
+            items[index].canCreateCloudRecord = false
+        }
         try write(items, owner: owner)
     }
 
@@ -134,7 +168,8 @@ actor PendingCloudUploads {
     }
 }
 
-actor PendingCloudDeletes {
+@MainActor
+final class PendingCloudDeletes {
     static let shared = PendingCloudDeletes()
 
     private func file(for owner: String) throws -> URL {
