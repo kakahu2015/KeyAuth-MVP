@@ -88,7 +88,10 @@ actor CloudKitManager {
             }
         } catch let error as CKError where error.code == .unknownItem {
             // An acknowledged record that disappeared was deleted remotely.
-            guard item.cloudChangeTag == nil else { return nil }
+            if item.cloudChangeTag != nil {
+                if item.needsUpload { throw CloudKitManagerError.accountMissing(item.id) }
+                return nil
+            }
             guard item.canCreateCloudRecord else { throw CloudKitManagerError.accountMissing(item.id) }
             record = CKRecord(recordType: recordType, recordID: recordID)
         }

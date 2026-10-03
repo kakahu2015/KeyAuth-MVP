@@ -188,6 +188,11 @@ final class OTPStore: ObservableObject {
                 } else {
                     confirmed.removeValue(forKey: item.id)
                     if item.cloudChangeTag != nil {
+                        if item.needsUpload {
+                            conflictingAccountID = item.id
+                            conflictRemoteMissing = true
+                            throw CloudKitManagerError.accountMissing(item.id)
+                        }
                         deletedIDs.insert(item.id.uuidString)
                         accounts.removeAll { $0.id == item.id }
                     }
@@ -489,11 +494,6 @@ final class OTPStore: ObservableObject {
         do {
             guard isReady, masterKey != nil else {
                 throw OTPStoreError.masterKeyUnavailable
-            }
-
-            // Another iPhone may already have created the Recovery Envelope.
-            if try await RecoveryManager.shared.cloudRecoveryExists() {
-                throw RecoveryError.alreadyEnabled
             }
 
             guard vaultSessionID == session, isReady else { return nil }

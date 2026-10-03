@@ -2,6 +2,7 @@ import Foundation
 import CryptoKit
 import Security
 import CloudKit
+@preconcurrency import LocalAuthentication
 
 enum RecoveryError: LocalizedError {
     case invalidRecoveryKey
@@ -57,17 +58,25 @@ actor RecoveryManager {
         keys: [Int: SymmetricKey],
         currentVersion: Int
     ) async throws -> RecoverySetupResult {
-        let rawRecoveryKey = try random32()
+        // Reuse a key saved by an interrupted setup; never publish an
+        // envelope before its key is durable on this device.
+        let existingKey = try await KeychainManager.shared.readRecoveryKey(context: LAContext())
+        if existingKey == nil, try await cloudRecoveryExists() {
+            throw RecoveryError.alreadyEnabled
+        }
+        let rawRecoveryKey: Data
+        if let existingKey {
+            rawRecoveryKey = Self.data(from: existingKey)
+        } else {
+            rawRecoveryKey = try random32()
+            try await KeychainManager.shared.storeRecoveryKey(rawRecoveryKey)
+        }
         let recoveryKey = SymmetricKey(data: rawRecoveryKey)
 
         try await updateEnvelope(
             recoveryKey: recoveryKey,
             keys: keys,
             currentVersion: currentVersion
-        )
-
-        try await KeychainManager.shared.storeRecoveryKey(
-            rawRecoveryKey
         )
 
         return RecoverySetupResult(
